@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1" />
+<title>Rendement</title>
+
+<!-- PWA / iOS home screen -->
+<link rel="manifest" href="manifest.json" />
+<meta name="theme-color" content="#12202f" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="apple-mobile-web-app-title" content="Rendement" />
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png" />
+<link rel="icon" href="icons/favicon.png" />
+
+<link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+
+<header class="topbar">
+  <h1>Rendement</h1>
+  <span id="today-date" class="topbar-date"></span>
+</header>
+
+<main id="views">
+
+  <!-- ===================== ONGLET AUJOURD'HUI ===================== -->
+  <section id="view-today" class="view active">
+
+    <div class="card">
+      <label class="field">
+        <span>Poste / machine</span>
+        <input type="text" id="input-poste" placeholder="Ex : Presse 3, ligne montage..." />
+      </label>
+      <div class="field-row">
+        <label class="field">
+          <span>Début</span>
+          <input type="time" id="input-heure-debut" />
+        </label>
+        <label class="field">
+          <span>Fin</span>
+          <input type="time" id="input-heure-fin" />
+          <button type="button" class="btn-mini" id="btn-fin-maintenant">maintenant</button>
+        </label>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header">
+        <h2>Temps non-productif</h2>
+        <span id="non-prod-total" class="badge">0 min</span>
+      </div>
+
+      <div id="timer-idle" class="timer-block">
+        <button type="button" id="btn-start-timer" class="btn-primary btn-large">▶ Démarrer une pause</button>
+        <button type="button" id="btn-add-manual" class="btn-secondary">+ Ajouter manuellement</button>
+      </div>
+
+      <div id="timer-running" class="timer-block hidden">
+        <div class="timer-live">
+          <span id="timer-category-label">—</span>
+          <span id="timer-elapsed" class="timer-elapsed">00:00:00</span>
+        </div>
+        <button type="button" id="btn-stop-timer" class="btn-danger btn-large">■ Arrêter la pause</button>
+      </div>
+
+      <ul id="non-prod-list" class="session-list"></ul>
+    </div>
+
+    <div class="card">
+      <div class="card-header">
+        <h2>Production</h2>
+      </div>
+      <div class="field-row">
+        <label class="field">
+          <span>Quantité produite</span>
+          <input type="number" inputmode="numeric" min="0" id="input-quantite" placeholder="0" />
+        </label>
+        <label class="field">
+          <span>Cadence théo. (pièces/h)</span>
+          <input type="number" inputmode="numeric" min="0" id="input-cadence" placeholder="0" />
+        </label>
+      </div>
+    </div>
+
+    <div class="card result-card">
+      <div class="result-grid">
+        <div class="result-item">
+          <span class="result-label">Ouverture</span>
+          <span id="result-ouverture" class="result-value">--</span>
+        </div>
+        <div class="result-item">
+          <span class="result-label">Non-productif</span>
+          <span id="result-non-prod" class="result-value">--</span>
+        </div>
+        <div class="result-item">
+          <span class="result-label">Temps net</span>
+          <span id="result-net" class="result-value">--</span>
+        </div>
+      </div>
+      <div class="rendement-display">
+        <span class="rendement-label">Rendement</span>
+        <span id="rendement-value" class="rendement-value">--</span>
+      </div>
+    </div>
+
+    <div class="card">
+      <label class="field">
+        <span>Notes</span>
+        <textarea id="input-note" rows="3" placeholder="Remarques sur la journée..."></textarea>
+      </label>
+    </div>
+
+    <button type="button" id="btn-save-entry" class="btn-primary btn-large btn-save">💾 Enregistrer la journée</button>
+    <button type="button" id="btn-reset-draft" class="btn-text">Réinitialiser le brouillon du jour</button>
+
+  </section>
+
+  <!-- ===================== ONGLET HISTORIQUE ===================== -->
+  <section id="view-history" class="view">
+    <div class="card-header standalone">
+      <h2>Historique</h2>
+      <button type="button" id="btn-export-csv" class="btn-secondary">Exporter CSV</button>
+    </div>
+    <ul id="history-list" class="history-list"></ul>
+    <p id="history-empty" class="empty-msg hidden">Aucune journée enregistrée pour le moment.</p>
+  </section>
+
+  <!-- ===================== ONGLET REGLAGES ===================== -->
+  <section id="view-settings" class="view">
+    <div class="card">
+      <h2>Valeurs par défaut</h2>
+      <label class="field">
+        <span>Cadence théorique par défaut (pièces/h)</span>
+        <input type="number" inputmode="numeric" min="0" id="settings-cadence" />
+      </label>
+    </div>
+
+    <div class="card">
+      <div class="card-header">
+        <h2>Catégories de pause</h2>
+      </div>
+      <ul id="category-list" class="category-list"></ul>
+      <div class="field-row">
+        <input type="text" id="new-category-input" placeholder="Nouvelle catégorie..." />
+        <button type="button" id="btn-add-category" class="btn-secondary">Ajouter</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Apparence</h2>
+      <div class="segmented" id="theme-toggle">
+        <button type="button" data-theme="auto" class="segmented-btn">Auto</button>
+        <button type="button" data-theme="light" class="segmented-btn">Clair</button>
+        <button type="button" data-theme="dark" class="segmented-btn">Sombre</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Données</h2>
+      <button type="button" id="btn-reset-all" class="btn-danger">Réinitialiser toutes les données</button>
+    </div>
+  </section>
+
+</main>
+
+<nav class="tabbar">
+  <button type="button" class="tab-btn active" data-view="view-today">
+    <span class="tab-icon">⏱️</span><span>Aujourd'hui</span>
+  </button>
+  <button type="button" class="tab-btn" data-view="view-history">
+    <span class="tab-icon">📋</span><span>Historique</span>
+  </button>
+  <button type="button" class="tab-btn" data-view="view-settings">
+    <span class="tab-icon">⚙️</span><span>Réglages</span>
+  </button>
+</nav>
+
+<!-- ===================== MODALE CATEGORIE (démarrage pause) ===================== -->
+<div id="modal-category" class="modal-overlay hidden">
+  <div class="modal-sheet">
+    <h2>Motif de la pause</h2>
+    <ul id="modal-category-list" class="modal-category-list"></ul>
+    <label class="field">
+      <span>Note (optionnel)</span>
+      <input type="text" id="modal-category-note" placeholder="Précision..." />
+    </label>
+    <div class="modal-actions">
+      <button type="button" id="modal-category-cancel" class="btn-text">Annuler</button>
+      <button type="button" id="modal-category-confirm" class="btn-primary">Démarrer</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===================== MODALE AJOUT MANUEL ===================== -->
+<div id="modal-manual" class="modal-overlay hidden">
+  <div class="modal-sheet">
+    <h2>Ajouter une pause manuellement</h2>
+    <ul id="modal-manual-category-list" class="modal-category-list"></ul>
+    <label class="field">
+      <span>Durée (minutes)</span>
+      <input type="number" inputmode="numeric" min="1" id="modal-manual-duration" placeholder="ex : 15" />
+    </label>
+    <label class="field">
+      <span>Note (optionnel)</span>
+      <input type="text" id="modal-manual-note" placeholder="Précision..." />
+    </label>
+    <div class="modal-actions">
+      <button type="button" id="modal-manual-cancel" class="btn-text">Annuler</button>
+      <button type="button" id="modal-manual-confirm" class="btn-primary">Ajouter</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===================== MODALE DETAIL HISTORIQUE ===================== -->
+<div id="modal-detail" class="modal-overlay hidden">
+  <div class="modal-sheet">
+    <h2 id="modal-detail-title">Détail</h2>
+    <div id="modal-detail-body" class="detail-body"></div>
+    <div class="modal-actions">
+      <button type="button" id="modal-detail-delete" class="btn-danger">Supprimer</button>
+      <button type="button" id="modal-detail-close" class="btn-text">Fermer</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast" class="toast hidden"></div>
+
+<script src="js/app.js"></script>
+</body>
+</html>
