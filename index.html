@@ -25,57 +25,68 @@
     <span id="today-date" class="date"></span>
   </header>
 
-  <section class="hero">
-    <div id="hero-status" class="hero-status idle">
-      <span class="dot"></span>
-      <span id="hero-status-text">En attente</span>
+  <!-- ===================== VUE MINUTEUR ===================== -->
+  <main id="view-timer" class="view active">
+
+    <section class="hero">
+      <div id="hero-status" class="hero-status idle">
+        <span class="dot"></span>
+        <span id="hero-status-text">En attente</span>
+      </div>
+      <div id="hero-timer" class="hero-timer">00:00:00</div>
+      <div id="hero-hint" class="hero-hint">Appuie sur une catégorie pour démarrer</div>
+    </section>
+
+    <section id="cat-list" class="cats"></section>
+
+    <button type="button" id="btn-manage-cats" class="btn-add-cat">+ Ajouter une catégorie</button>
+
+    <footer class="footer">
+      <div class="grand-total">
+        <span class="grand-total-label">Total non-productif</span>
+        <span id="grand-total" class="grand-total-value">00:00</span>
+      </div>
+      <button type="button" id="btn-save-day" class="btn-save-day">✓ Enregistrer la journée</button>
+      <button type="button" id="btn-reset" class="btn-reset">Remettre à zéro sans enregistrer</button>
+    </footer>
+
+  </main>
+
+  <!-- ===================== VUE HISTORIQUE ===================== -->
+  <main id="view-history" class="view">
+    <div id="history-list" class="history-list"></div>
+    <p id="history-empty" class="history-empty">Aucune journée enregistrée.<br />Termine ta journée avec « Enregistrer la journée » et elle apparaîtra ici.</p>
+  </main>
+
+  <!-- ===================== BARRE D'ONGLETS ===================== -->
+  <nav class="tabbar">
+    <button type="button" class="tab-btn active" data-view="view-timer">
+      <span class="tab-icon">⏱</span>
+      <span>Minuteur</span>
+    </button>
+    <button type="button" class="tab-btn" data-view="view-history">
+      <span class="tab-icon">🗓</span>
+      <span>Historique</span>
+    </button>
+  </nav>
+
+  <!-- ===================== MODALE CATEGORIES ===================== -->
+  <div id="modal-cats" class="modal-overlay hidden">
+    <div class="modal-sheet">
+      <h2>Nouvelle catégorie</h2>
+      <div class="modal-add-row">
+        <input type="text" id="new-cat-input" placeholder="Ex : TEMPS RÉGLAGE" maxlength="30" />
+        <button type="button" id="btn-add-cat" class="btn-confirm">Ajouter</button>
+      </div>
+      <div id="custom-cat-section" class="hidden">
+        <h3>Mes catégories</h3>
+        <ul id="custom-cat-list" class="custom-cat-list"></ul>
+      </div>
+      <button type="button" id="modal-cats-close" class="btn-close">Fermer</button>
     </div>
-    <div id="hero-timer" class="hero-timer">00:00:00</div>
-    <div id="hero-hint" class="hero-hint">Appuie sur une catégorie pour démarrer</div>
-  </section>
+  </div>
 
-  <section class="cats">
-    <button type="button" class="cat" data-cat="cms" style="--c: var(--cms)">
-      <span class="cat-left">
-        <span class="cat-icon" aria-hidden="true"></span>
-        <span class="cat-name">TEMPS CMS</span>
-      </span>
-      <span class="cat-right">
-        <span class="cat-total" id="total-cms">0:00</span>
-        <span class="cat-action">▶</span>
-      </span>
-    </button>
-
-    <button type="button" class="cat" data-cat="cf" style="--c: var(--cf)">
-      <span class="cat-left">
-        <span class="cat-icon" aria-hidden="true"></span>
-        <span class="cat-name">TEMPS CF</span>
-      </span>
-      <span class="cat-right">
-        <span class="cat-total" id="total-cf">0:00</span>
-        <span class="cat-action">▶</span>
-      </span>
-    </button>
-
-    <button type="button" class="cat" data-cat="rep" style="--c: var(--rep)">
-      <span class="cat-left">
-        <span class="cat-icon" aria-hidden="true"></span>
-        <span class="cat-name">TEMPS RÉPARATION</span>
-      </span>
-      <span class="cat-right">
-        <span class="cat-total" id="total-rep">0:00</span>
-        <span class="cat-action">▶</span>
-      </span>
-    </button>
-  </section>
-
-  <footer class="footer">
-    <div class="grand-total">
-      <span class="grand-total-label">Total non-productif</span>
-      <span id="grand-total" class="grand-total-value">0:00</span>
-    </div>
-    <button type="button" id="btn-reset" class="btn-reset">Remettre à zéro</button>
-  </footer>
+  <div id="toast" class="toast hidden"></div>
 
 </div>
 
