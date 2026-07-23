@@ -1,48 +1,39 @@
 # Rendement
 
-Bloc-notes iOS (PWA) pour noter ton rendement d'atelier en fin de poste.
+Minuteur de temps non-productif pour l'atelier, installable sur iPhone (PWA).
 
-L'app fonctionne 100% en local sur ton téléphone (aucune donnée envoyée sur internet, aucun compte) et hors-ligne une fois installée.
+Trois compteurs, un seul geste :
 
-## Principe
+- **TEMPS CMS**
+- **TEMPS CF**
+- **TEMPS RÉPARATION**
 
-- Tu renseignes l'heure de début et de fin de ton poste (= temps d'ouverture).
-- Dès que tu quittes la production pour une tâche annexe (changement de série, panne, réunion, entraide sur un autre poste...), tu démarres le minuteur "pause" avec le motif correspondant. Tu l'arrêtes quand tu reprends la production.
-- En fin de poste, tu saisis la quantité produite et la cadence théorique (pièces/heure).
-- L'app calcule automatiquement :
-  - **Temps net** = temps d'ouverture − temps non-productif cumulé
-  - **Rendement** = (quantité produite ÷ cadence théorique × 60) ÷ temps net × 100
+Appuie sur une catégorie pour démarrer le chrono, appuie à nouveau pour l'arrêter. Appuyer sur une autre catégorie bascule directement le chrono dessus. Chaque catégorie cumule son temps de la journée, et le total non-productif s'affiche en bas. Un bouton remet tout à zéro en fin de poste.
 
-Le temps passé hors production ne vient donc plus pénaliser injustement ton rendement.
-
-Tu peux enregistrer la journée dans l'historique, consulter les jours précédents et exporter le tout en CSV (Excel).
+Tout est stocké en local sur le téléphone (aucune donnée envoyée sur internet) et l'app fonctionne hors-ligne une fois installée. Le chrono continue de tourner même si l'app est fermée : il est basé sur l'heure de démarrage, pas sur un compteur actif.
 
 ## Installer sur iPhone
 
-1. Héberge les fichiers (le plus simple : active **GitHub Pages** sur ce dépôt — Settings → Pages → Source: "GitHub Actions". Le workflow `.github/workflows/deploy-pages.yml` publie le site automatiquement à chaque push sur `main`).
-2. Ouvre l'URL du site dans **Safari** sur iPhone.
-3. Appuie sur le bouton Partager (carré avec flèche) puis **"Sur l'écran d'accueil"**.
-4. L'icône "Rendement" apparaît sur ton écran d'accueil et s'ouvre en plein écran, comme une vraie app.
+1. Ouvre https://kevingarnier67-commits.github.io/Rendement/ dans **Safari**.
+2. Bouton **Partager** → **"Sur l'écran d'accueil"** → **Ajouter**.
 
 ## Développement local
 
-Aucune dépendance ni build : ce sont des fichiers statiques.
+Fichiers statiques, aucune dépendance ni build :
 
 ```bash
 python3 -m http.server 8080
 ```
 
-Puis ouvre `http://localhost:8080` dans un navigateur.
-
 ## Structure
 
 ```
-index.html            page unique (3 onglets : Aujourd'hui / Historique / Réglages)
-css/style.css          styles (thème clair/sombre automatique)
-js/app.js              logique de l'app (minuteur, calculs, stockage local, export CSV)
+index.html            page unique (minuteur)
+css/style.css          styles
+js/app.js              logique (chrono, cumuls, stockage local)
 manifest.json          manifeste PWA
 service-worker.js      cache hors-ligne
 icons/                 icônes PWA / écran d'accueil iOS
 ```
 
-Toutes les données (réglages, brouillon du jour, historique) sont stockées dans le `localStorage` du navigateur, sur l'appareil uniquement.
+Le déploiement sur GitHub Pages est automatique à chaque push sur `main` (`.github/workflows/deploy-pages.yml`).
