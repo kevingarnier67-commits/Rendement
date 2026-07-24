@@ -370,6 +370,57 @@
   render();
   renderHistory();
 
+  // ---------- bannière d'installation ----------
+  const INSTALL_DISMISS_KEY = "rendement.installDismissed.v1";
+  const installBanner = $("install-banner");
+  const installIos = $("install-ios");
+  const installAndroid = $("install-android");
+  const installButton = $("install-button");
+  const installDismiss = $("install-dismiss");
+  let deferredInstallPrompt = null;
+
+  function isStandalone() {
+    return window.matchMedia("(display-mode: standalone)").matches || window.navigator.standalone === true;
+  }
+  function isIos() {
+    return /iphone|ipad|ipod/i.test(navigator.userAgent);
+  }
+
+  function maybeShowInstallBanner() {
+    if (isStandalone()) return;
+    if (localStorage.getItem(INSTALL_DISMISS_KEY)) return;
+    if (isIos()) {
+      installIos.classList.remove("hidden");
+      installBanner.classList.remove("hidden");
+    } else if (deferredInstallPrompt) {
+      installAndroid.classList.remove("hidden");
+      installBanner.classList.remove("hidden");
+    }
+  }
+
+  window.addEventListener("beforeinstallprompt", (e) => {
+    e.preventDefault();
+    deferredInstallPrompt = e;
+    maybeShowInstallBanner();
+  });
+
+  installButton.addEventListener("click", async () => {
+    if (!deferredInstallPrompt) return;
+    deferredInstallPrompt.prompt();
+    await deferredInstallPrompt.userChoice;
+    deferredInstallPrompt = null;
+    installBanner.classList.add("hidden");
+  });
+
+  installDismiss.addEventListener("click", () => {
+    localStorage.setItem(INSTALL_DISMISS_KEY, "1");
+    installBanner.classList.add("hidden");
+  });
+
+  window.addEventListener("appinstalled", () => installBanner.classList.add("hidden"));
+
+  maybeShowInstallBanner();
+
   // ---------- service worker ----------
   if ("serviceWorker" in navigator) {
     window.addEventListener("load", () => {
