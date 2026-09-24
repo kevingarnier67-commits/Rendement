@@ -1,4 +1,4 @@
-const CACHE_NAME = "rendement-cache-v12";
+const CACHE_NAME = "rendement-cache-v13";
 const APP_SHELL = [
   "./",
   "./index.html",

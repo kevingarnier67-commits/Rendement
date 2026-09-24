@@ -25,7 +25,9 @@
   --red: #D70015;                /* rouge système, variante lisible */
   --red-soft: rgba(255, 59, 48, 0.14);
   --warn: #B25000;
-  --green: #248A3D;              /* vert système, variante lisible */
+  --green: #1E7D36;              /* vert système, variante lisible (≥ 4,5:1) */
+  --on-green: #FFFFFF;
+  --stop-bg: #FCEBEC;
 
   --glass: rgba(249, 249, 251, 0.72);
   --glass-strong: rgba(250, 250, 252, 0.94);
@@ -67,6 +69,8 @@
     --red-soft: rgba(255, 69, 58, 0.22);
     --warn: #FFB340;
     --green: #30D158;
+    --on-green: #000000;
+    --stop-bg: #3C2727;
 
     --glass: rgba(37, 37, 40, 0.72);
     --glass-strong: rgba(44, 44, 46, 0.94);
@@ -321,7 +325,8 @@ button.row:active, .row-press:active { background: var(--cell-pressed); }
   font-weight: 600;
   color: var(--label-2);
 }
-.stopwatch.is-running .stopwatch-status { color: var(--label); }
+.stopwatch.is-running .stopwatch-status, .stopwatch.is-paused .stopwatch-status { color: var(--label); }
+.stopwatch.is-paused .stopwatch-time { color: var(--label-2); }
 .status-dot {
   display: inline-block;
   margin-right: 8px;
@@ -332,20 +337,24 @@ button.row:active, .row-press:active { background: var(--cell-pressed); }
   background: var(--fill-strong);
 }
 .stopwatch.is-running .status-dot { background: var(--tone); animation: pulse 1.6s ease-in-out infinite; }
+.stopwatch.is-paused .status-dot { background: var(--tone); }
 @keyframes pulse { 50% { opacity: 0.35; } }
-.round-stop {
-  margin-top: 12px;
-  width: 84px;
-  height: 84px;
-  border-radius: 50%;
-  background: var(--red-soft);
-  color: var(--red);
-  font-size: 1rem;
+/* Boutons ronds façon app Horloge : Pause / Reprendre à gauche, Arrêter à droite */
+.stopwatch-actions { display: flex; justify-content: center; gap: 28px; margin-top: 12px; }
+.stopwatch-actions:not(:has(> :not([hidden]))) { display: none; }
+.round-btn {
+  min-width: 96px;
+  min-height: 96px;
+  padding: 0 8px;
+  border-radius: 999px;
+  font-size: 0.882rem;
   font-weight: 600;
-  box-shadow: 0 0 0 3px var(--bg), 0 0 0 5px var(--red-soft);
-  transition: filter 120ms var(--ease);
+  transition: filter 120ms var(--ease), background-color 180ms var(--ease);
 }
-.round-stop:active { filter: brightness(0.9); }
+.round-btn:active { filter: brightness(0.9); }
+.round-stop { background: var(--stop-bg); color: var(--red); box-shadow: 0 0 0 3px var(--bg), 0 0 0 5px var(--stop-bg); }
+.round-pause { background: var(--fill-strong); color: var(--label); box-shadow: 0 0 0 3px var(--bg), 0 0 0 5px var(--fill-strong); }
+.round-pause.is-resume { background: var(--green); color: var(--on-green); box-shadow: 0 0 0 3px var(--bg), 0 0 0 5px var(--green); }
 
 /* ---------- postes ---------- */
 .cat { --sep-inset: 58px; }
@@ -378,8 +387,11 @@ button.row:active, .row-press:active { background: var(--cell-pressed); }
 }
 .cat-toggle .icon { width: 16px; height: 16px; }
 .cat.is-running { background: color-mix(in srgb, var(--tone) 14%, var(--cell)); }
-.cat.is-running .cat-toggle { background: var(--red); color: #FFFFFF; }
 .cat.is-running .row-value { color: var(--label); font-weight: 600; }
+.cat.is-running .cat-toggle { background: var(--label); color: var(--cell); }
+.cat.is-paused { background: color-mix(in srgb, var(--tone) 7%, var(--cell)); }
+.cat.is-paused .cat-toggle { background: var(--green); color: var(--on-green); }
+.cat.is-paused .cat-sub::before { animation: none; opacity: 0.5; }
 
 /* ---------- matières ---------- */
 .prod { gap: 10px; padding-top: 8px; padding-bottom: 8px; }
@@ -577,6 +589,7 @@ button.row:active, .row-press:active { background: var(--cell-pressed); }
   box-shadow: 0 0 0 2px var(--cell);
   animation: pulse 1.6s ease-in-out infinite;
 }
+.tab-dot.is-paused { animation: none; opacity: 0.55; }
 .tab[aria-current="page"] { color: var(--tint); background: var(--fill); }
 
 /* ---------- feuilles (sheets) ---------- */
