@@ -1,0 +1,1 @@
+Source : https://github.com/nextlevelbuilder/ui-ux-pro-max-skill @ dcc40ff5133ef78276117db0cc34e7b83cc8aeba (dossier .claude/skills/ui-ux-pro-max, sans scripts/tests)
