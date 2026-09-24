@@ -17,12 +17,19 @@
     return "id-" + Date.now() + "-" + Math.random().toString(16).slice(2);
   }
 
+  const DEFAULT_BASE = 455;
+
+  function freshCalcLines() {
+    return [{ id: uuid(), qty: "", unit: "" }];
+  }
+
   function freshState() {
     return {
       categories: JSON.parse(JSON.stringify(DEFAULT_CATEGORIES)),
       totals: {},
       active: null,
       history: [],
+      calc: { base: DEFAULT_BASE, lines: freshCalcLines() },
     };
   }
 
@@ -31,7 +38,10 @@
       const raw = localStorage.getItem(KEY);
       if (raw) {
         const s = JSON.parse(raw);
-        if (s && Array.isArray(s.categories)) return s;
+        if (s && Array.isArray(s.categories)) {
+          if (!s.calc) s.calc = { base: DEFAULT_BASE, lines: freshCalcLines() };
+          return s;
+        }
       }
       // migration depuis la version précédente (3 catégories fixes, pas d'historique)
       const old = localStorage.getItem(OLD_KEY);
@@ -56,17 +66,23 @@
   // ---------- formatting ----------
   function pad2(n) { return String(n).padStart(2, "0"); }
 
-  function formatHMS(ms) {
+  // Tout est exprimé en minutes, jamais en heures (ex : 75 min, pas 1:15).
+  function minutesOf(ms) { return Math.floor(ms / 60000); }
+
+  function formatMinutes(ms) { return `${minutesOf(ms)} min`; }
+
+  function formatMinSec(ms) {
     const totalSec = Math.floor(ms / 1000);
-    return `${pad2(Math.floor(totalSec / 3600))}:${pad2(Math.floor((totalSec % 3600) / 60))}:${pad2(totalSec % 60)}`;
+    return `${pad2(Math.floor(totalSec / 60))}:${pad2(totalSec % 60)}`;
   }
 
-  function formatTotal(ms) {
-    const totalSec = Math.floor(ms / 1000);
-    const h = Math.floor(totalSec / 3600);
-    const m = Math.floor((totalSec % 3600) / 60);
-    const s = totalSec % 60;
-    return h > 0 ? `${h}:${pad2(m)}:${pad2(s)}` : `${pad2(m)}:${pad2(s)}`;
+  function formatNumber(n, decimals) {
+    return n.toLocaleString("fr-FR", { minimumFractionDigits: 0, maximumFractionDigits: decimals });
+  }
+
+  function parseNum(str) {
+    const n = parseFloat(String(str).replace(",", ".").replace(/\s/g, ""));
+    return isFinite(n) ? n : 0;
   }
 
   // ---------- DOM ----------
@@ -82,6 +98,14 @@
     saveDay: $("btn-save-day"),
     reset: $("btn-reset"),
     manageCats: $("btn-manage-cats"),
+    calcBase: $("calc-base"),
+    calcMinuted: $("calc-minuted"),
+    calcNet: $("calc-net"),
+    calcLines: $("calc-lines"),
+    calcAddLine: $("btn-add-line"),
+    calcProduced: $("calc-produced"),
+    calcRendement: $("calc-rendement"),
+    calcClear: $("btn-calc-clear"),
     historyList: $("history-list"),
     historyEmpty: $("history-empty"),
     modalCats: $("modal-cats"),
@@ -124,8 +148,13 @@
     persist();
   }
 
-  function grandTotalMs() {
-    return state.categories.reduce((acc, c) => acc + totalOf(c.id), 0) + activeElapsed();
+  function liveTotalOf(id) {
+    return totalOf(id) + (state.active && state.active.id === id ? activeElapsed() : 0);
+  }
+
+  // Somme des minutes affichées par catégorie, pour que le total colle toujours au détail.
+  function minutedMinutes() {
+    return state.categories.reduce((acc, c) => acc + minutesOf(liveTotalOf(c.id)), 0);
   }
 
   // ---------- category cards ----------
@@ -143,7 +172,7 @@
           <span class="cat-name"></span>
         </span>
         <span class="cat-right">
-          <span class="cat-total">00:00</span>
+          <span class="cat-total">0 min</span>
           <span class="cat-action">▶</span>
         </span>`;
       btn.querySelector(".cat-name").textContent = cat.label;
@@ -170,7 +199,7 @@
       const isActive = id === activeId;
       btn.classList.toggle("active", isActive);
       btn.querySelector(".cat-action").textContent = isActive ? "■" : "▶";
-      btn.querySelector(".cat-total").textContent = formatTotal(totalOf(id) + (isActive ? activeElapsed() : 0));
+      btn.querySelector(".cat-total").textContent = formatMinutes(liveTotalOf(id));
     });
 
     if (activeCat) {
@@ -179,17 +208,88 @@
       el.statusText.textContent = activeCat.label;
       el.timer.classList.add("running");
       el.timer.style.setProperty("--active-color", activeCat.color);
-      el.timer.textContent = formatHMS(activeElapsed());
+      el.timer.textContent = formatMinSec(activeElapsed());
       el.hint.textContent = "Appuie à nouveau pour arrêter";
     } else {
       el.status.classList.remove("running");
       el.statusText.textContent = "En attente";
       el.timer.classList.remove("running");
-      el.timer.textContent = "00:00:00";
+      el.timer.textContent = "00:00";
       el.hint.textContent = "Appuie sur une catégorie pour démarrer";
     }
 
-    el.grandTotal.textContent = formatTotal(grandTotalMs());
+    el.grandTotal.textContent = `${minutedMinutes()} min`;
+    renderCalcResults();
+  }
+
+  // ---------- calculatrice de rendement ----------
+  // Temps de production = base (455 min) − minutes passées aux postes minutés.
+  // Rendement = minutes produites (Σ quantité × temps/pièce) ÷ temps de production.
+  function computeCalc() {
+    const base = parseNum(state.calc.base);
+    const minuted = minutedMinutes();
+    const net = base - minuted;
+    const produced = state.calc.lines.reduce((acc, l) => acc + parseNum(l.qty) * parseNum(l.unit), 0);
+    const rendement = net > 0 && produced > 0 ? (produced / net) * 100 : null;
+    return { base, minuted, net, produced, rendement };
+  }
+
+  function rendementClass(pct) {
+    if (pct == null) return "";
+    if (pct >= 95) return "good";
+    if (pct >= 80) return "mid";
+    return "low";
+  }
+
+  function renderCalcResults() {
+    const c = computeCalc();
+    el.calcMinuted.textContent = `${c.minuted} min`;
+    el.calcNet.textContent = `${formatNumber(c.net, 1)} min`;
+    el.calcProduced.textContent = `${formatNumber(c.produced, 1)} min`;
+    el.calcRendement.textContent = c.rendement == null ? "--" : `${formatNumber(c.rendement, 1)} %`;
+    el.calcRendement.className = "calc-result-value " + rendementClass(c.rendement);
+    state.calc.lines.forEach((line) => {
+      const out = el.calcLines.querySelector(`[data-line="${line.id}"] .calc-line-total`);
+      if (out) out.textContent = `= ${formatNumber(parseNum(line.qty) * parseNum(line.unit), 1)} min`;
+    });
+  }
+
+  function renderCalcLines() {
+    el.calcBase.value = state.calc.base;
+    el.calcLines.innerHTML = "";
+    state.calc.lines.forEach((line, idx) => {
+      const row = document.createElement("div");
+      row.className = "calc-line";
+      row.dataset.line = line.id;
+      row.innerHTML = `
+        <label class="calc-field">
+          <span>Quantité</span>
+          <input type="text" inputmode="decimal" class="calc-qty" placeholder="0" />
+        </label>
+        <span class="calc-times">×</span>
+        <label class="calc-field">
+          <span>Min / pièce</span>
+          <input type="text" inputmode="decimal" class="calc-unit" placeholder="0,00" />
+        </label>
+        <button type="button" class="calc-line-delete" aria-label="Supprimer la ligne">✕</button>
+        <span class="calc-line-total">= 0 min</span>`;
+      const qty = row.querySelector(".calc-qty");
+      const unit = row.querySelector(".calc-unit");
+      qty.value = line.qty;
+      unit.value = line.unit;
+      qty.addEventListener("input", () => { line.qty = qty.value; persist(); renderCalcResults(); });
+      unit.addEventListener("input", () => { line.unit = unit.value; persist(); renderCalcResults(); });
+      const del = row.querySelector(".calc-line-delete");
+      if (state.calc.lines.length === 1 && idx === 0) del.classList.add("invisible");
+      del.addEventListener("click", () => {
+        state.calc.lines = state.calc.lines.filter((l) => l.id !== line.id);
+        if (!state.calc.lines.length) state.calc.lines = freshCalcLines();
+        persist();
+        renderCalcLines();
+        renderCalcResults();
+      });
+      el.calcLines.appendChild(row);
+    });
   }
 
   // ---------- save day / reset ----------
@@ -203,9 +303,10 @@
     stopActive();
     const items = state.categories
       .map((c) => ({ label: c.label, color: c.color, ms: totalOf(c.id) }))
-      .filter((i) => i.ms > 0);
-    const totalMs = items.reduce((acc, i) => acc + i.ms, 0);
-    if (totalMs === 0) { toast("Aucun temps à enregistrer"); return; }
+      .filter((i) => minutesOf(i.ms) > 0);
+    const totalMs = items.reduce((acc, i) => acc + minutesOf(i.ms) * 60000, 0);
+    const calc = computeCalc();
+    if (totalMs === 0 && calc.produced === 0) { toast("Rien à enregistrer"); return; }
     if (!confirm("Enregistrer la journée dans l'historique et remettre les compteurs à zéro ?")) return;
     const now = new Date();
     state.history.unshift({
@@ -214,11 +315,37 @@
       dateLabel: now.toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long", year: "numeric" }),
       items,
       totalMs,
+      calc: calc.produced > 0 ? calc : null,
     });
+    state.calc.lines = freshCalcLines();
     resetTotals();
+    renderCalcLines();
     renderHistory();
     render();
     toast("Journée enregistrée ✓");
+  });
+
+  el.calcBase.addEventListener("input", () => {
+    state.calc.base = el.calcBase.value;
+    persist();
+    renderCalcResults();
+  });
+
+  el.calcAddLine.addEventListener("click", () => {
+    state.calc.lines.push({ id: uuid(), qty: "", unit: "" });
+    persist();
+    renderCalcLines();
+    renderCalcResults();
+    const inputs = el.calcLines.querySelectorAll(".calc-qty");
+    inputs[inputs.length - 1].focus();
+  });
+
+  el.calcClear.addEventListener("click", () => {
+    if (!confirm("Effacer toutes les lignes de production ?")) return;
+    state.calc.lines = freshCalcLines();
+    persist();
+    renderCalcLines();
+    renderCalcResults();
   });
 
   el.reset.addEventListener("click", () => {
@@ -243,7 +370,12 @@
       dateSpan.textContent = entry.dateLabel;
       const totalSpan = document.createElement("span");
       totalSpan.className = "history-total";
-      totalSpan.textContent = formatTotal(entry.totalMs);
+      if (entry.calc && entry.calc.rendement != null) {
+        totalSpan.textContent = `${formatNumber(entry.calc.rendement, 1)} %`;
+        totalSpan.classList.add(rendementClass(entry.calc.rendement));
+      } else {
+        totalSpan.textContent = formatMinutes(entry.totalMs);
+      }
       head.appendChild(dateSpan);
       head.appendChild(totalSpan);
       card.appendChild(head);
@@ -262,9 +394,32 @@
         left.appendChild(label);
         const time = document.createElement("span");
         time.className = "history-row-time";
-        time.textContent = formatTotal(item.ms);
+        time.textContent = formatMinutes(item.ms);
         row.appendChild(left);
         row.appendChild(time);
+        card.appendChild(row);
+      });
+
+      const summary = [["Total minuté", formatMinutes(entry.totalMs)]];
+      if (entry.calc) {
+        const c = entry.calc;
+        summary.push(
+          ["Temps de production", `${formatNumber(c.base, 1)} − ${c.minuted} = ${formatNumber(c.net, 1)} min`],
+          ["Minutes produites", `${formatNumber(c.produced, 1)} min`],
+          ["Rendement", c.rendement == null ? "--" : `${formatNumber(c.rendement, 1)} %`],
+        );
+      }
+      summary.forEach(([k, v]) => {
+        const row = document.createElement("div");
+        row.className = "history-row history-summary";
+        const left = document.createElement("span");
+        left.className = "history-row-label";
+        left.textContent = k;
+        const right = document.createElement("span");
+        right.className = "history-row-time";
+        right.textContent = v;
+        row.appendChild(left);
+        row.appendChild(right);
         card.appendChild(row);
       });
 
@@ -367,6 +522,7 @@
 
   // ---------- init ----------
   renderCats();
+  renderCalcLines();
   render();
   renderHistory();
 

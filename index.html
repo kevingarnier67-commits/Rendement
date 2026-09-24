@@ -33,7 +33,7 @@
         <span class="dot"></span>
         <span id="hero-status-text">En attente</span>
       </div>
-      <div id="hero-timer" class="hero-timer">00:00:00</div>
+      <div id="hero-timer" class="hero-timer">00:00</div>
       <div id="hero-hint" class="hero-hint">Appuie sur une catégorie pour démarrer</div>
     </section>
 
@@ -44,11 +44,51 @@
     <footer class="footer">
       <div class="grand-total">
         <span class="grand-total-label">Total non-productif</span>
-        <span id="grand-total" class="grand-total-value">00:00</span>
+        <span id="grand-total" class="grand-total-value">0 min</span>
       </div>
       <button type="button" id="btn-save-day" class="btn-save-day">✓ Enregistrer la journée</button>
       <button type="button" id="btn-reset" class="btn-reset">Remettre à zéro sans enregistrer</button>
     </footer>
+
+  </main>
+
+  <!-- ===================== VUE CALCUL ===================== -->
+  <main id="view-calc" class="view">
+
+    <section class="calc-card">
+      <h3>Temps de production</h3>
+      <div class="calc-row">
+        <span>Base</span>
+        <span class="calc-base-wrap"><input type="text" inputmode="decimal" id="calc-base" class="calc-base" /> min</span>
+      </div>
+      <div class="calc-row">
+        <span>− Minutes aux postes minutés</span>
+        <span id="calc-minuted" class="calc-value">0 min</span>
+      </div>
+      <div class="calc-row calc-row-total">
+        <span>= Temps de production</span>
+        <span id="calc-net" class="calc-value">455 min</span>
+      </div>
+    </section>
+
+    <section class="calc-card">
+      <div class="calc-card-head">
+        <h3>Production</h3>
+        <button type="button" id="btn-calc-clear" class="calc-clear">Effacer</button>
+      </div>
+      <div id="calc-lines" class="calc-lines"></div>
+      <button type="button" id="btn-add-line" class="btn-add-cat">+ Ajouter une référence</button>
+      <div class="calc-row calc-row-total">
+        <span>Minutes produites</span>
+        <span id="calc-produced" class="calc-value">0 min</span>
+      </div>
+    </section>
+
+    <section class="calc-result">
+      <span class="calc-result-label">Rendement</span>
+      <span id="calc-rendement" class="calc-result-value">--</span>
+      <span class="calc-formula">minutes produites ÷ temps de production</span>
+    </section>
 
   </main>
 
@@ -63,6 +103,10 @@
     <button type="button" class="tab-btn active" data-view="view-timer">
       <span class="tab-icon">⏱</span>
       <span>Minuteur</span>
+    </button>
+    <button type="button" class="tab-btn" data-view="view-calc">
+      <span class="tab-icon">🧮</span>
+      <span>Calcul</span>
     </button>
     <button type="button" class="tab-btn" data-view="view-history">
       <span class="tab-icon">🗓</span>
