@@ -16,8 +16,8 @@ L'onglet **Calcul** part de la base de 455 min (modifiable) :
 
 - **Temps de production** = 455 − minutes minutées (reprises automatiquement du minuteur)
 - **Minutes produites** = somme, pour chaque matière (Pôles, Pôles 80/100A, S1, Liaisons, Cages, MFV, + matières ajoutées), de la quantité × sa cadence (« X pièces en Y min », ex. Cages 470 en 60 min). Les cadences sont mémorisées ; seules les quantités sont à saisir chaque jour.
-- **Rendement** = minutes produites ÷ temps de production, affiché dans un anneau (vert quand l'objectif est atteint)
-- **Objectif** (100 % par défaut, modifiable) : l'app indique combien de minutes de production il reste pour l'atteindre
+- **Rendement** = minutes produites ÷ temps de production, exprimé sur 1 (ex. 0,93 ; 1 = objectif plein), affiché dans un anneau (vert quand l'objectif est atteint)
+- **Objectif** (1 par défaut, modifiable) : l'app indique combien de minutes de production il reste pour l'atteindre
 
 « Enregistrer la journée » archive les minutes par catégorie et le rendement dans l'onglet **Historique**, puis remet les compteurs à zéro.
 

@@ -43,7 +43,7 @@
     { id: "mfv", label: "MFV", refQty: "", refMin: "" },
   ];
   const RATES_VERSION = 1;
-  const DEFAULT_TARGET = "100";
+  const DEFAULT_TARGET = "1";  // rendement exprimé sur 1 (1 = 100 %)
 
   // Les cadences sont mémorisées d'un jour à l'autre ; seules les quantités (qty) sont remises à zéro.
   function freshCalc() {
@@ -89,6 +89,8 @@
       next.ratesVersion = RATES_VERSION;
     }
     if (next.target == null) next.target = DEFAULT_TARGET;
+    // ancien objectif saisi en % (ex. 100) → sur 1
+    else if (parseNum(next.target) > 5) next.target = formatNumber(parseNum(next.target) / 100, 3);
     if (!next.qty || typeof next.qty !== "object") next.qty = {};
     return next;
   }
@@ -172,6 +174,11 @@
 
   function formatNumber(n, decimals) {
     return n.toLocaleString("fr-FR", { minimumFractionDigits: 0, maximumFractionDigits: decimals });
+  }
+
+  // Le rendement est calculé en % en interne (historique compatible) mais affiché sur 1 : 93,3 % → 0,93.
+  function formatRatio(pct) {
+    return (pct / 100).toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   }
 
   function parseNum(str) {
@@ -571,7 +578,7 @@
       .filter((i) => i.qty > 0);
     const produced = items.reduce((acc, i) => acc + i.minutes, 0);
     const rendement = net > 0 && produced > 0 ? (produced / net) * 100 : null;
-    const target = parseNum(state.calc.target) > 0 ? parseNum(state.calc.target) : parseNum(DEFAULT_TARGET);
+    const target = (parseNum(state.calc.target) > 0 ? parseNum(state.calc.target) : parseNum(DEFAULT_TARGET)) * 100;
     return { base, minuted, net, produced, rendement, target, items };
   }
 
@@ -579,12 +586,12 @@
 
   // Ce qu'il reste à produire pour atteindre l'objectif, en minutes.
   function gapText(c) {
-    const t = formatNumber(c.target, 1);
+    const t = formatNumber(c.target / 100, 2);
     if (c.net <= 0) return "Plus de temps de production : vérifie la base et les minutes minutées.";
-    if (c.rendement == null) return `Saisis ta production pour voir ton rendement. Objectif : ${t} %.`;
+    if (c.rendement == null) return `Saisis ta production pour voir ton rendement. Objectif : ${t}.`;
     const missing = (c.net * c.target) / 100 - c.produced;
-    if (missing > 0.05) return `Encore ${formatNumber(missing, 1)} min de production pour atteindre ${t} %.`;
-    return `Objectif de ${t} % atteint.`;
+    if (missing > 0.05) return `Encore ${formatNumber(missing, 1)} min de production pour atteindre ${t}.`;
+    return `Objectif de ${t} atteint.`;
   }
 
   function renderCalcResults() {
@@ -593,7 +600,7 @@
     el.calcNet.textContent = `${formatNumber(c.net, 1)} min`;
     el.calcNet2.textContent = `${formatNumber(c.net, 1)} min`;
     el.calcProduced.textContent = `${formatNumber(c.produced, 1)} min`;
-    el.calcRendement.textContent = c.rendement == null ? "--" : `${formatNumber(c.rendement, 1)} %`;
+    el.calcRendement.textContent = c.rendement == null ? "--" : formatRatio(c.rendement);
     const progress = Math.min((c.rendement || 0) / c.target, 1);
     el.calcRing.style.strokeDasharray = `${RING_LENGTH}`;
     el.calcRing.style.strokeDashoffset = `${RING_LENGTH * (1 - progress)}`;
@@ -838,7 +845,7 @@
     const values = days.map((d) => d.calc.rendement);
     const avg = values.reduce((a, b) => a + b, 0) / values.length;
     const top = Math.max(target * 1.15, ...values.map((v) => v * 1.08));
-    el.historyAvg.textContent = `${formatNumber(avg, 1)} %`;
+    el.historyAvg.textContent = formatRatio(avg);
     el.historyChart.innerHTML = "";
 
     const plot = document.createElement("div");
@@ -860,7 +867,7 @@
       const val = document.createElement("span");
       val.className = "chart-val";
       val.style.bottom = `calc(${(r / top) * 100}% + 4px)`;
-      val.textContent = `${Math.round(r)} %`;
+      val.textContent = formatRatio(r);
       col.append(bar, val);
       plot.appendChild(col);
 
@@ -874,17 +881,17 @@
     });
     el.historyChart.append(plot, labels);
     el.historyChart.setAttribute("aria-label", "Rendement des dernières journées : " +
-      days.map((d) => `${d.dateLabel} ${formatNumber(d.calc.rendement, 1)} %`).join(", ") +
-      `. Moyenne ${formatNumber(avg, 1)} %.`);
+      days.map((d) => `${d.dateLabel} ${formatRatio(d.calc.rendement)}`).join(", ") +
+      `. Moyenne ${formatRatio(avg)}.`);
     const reached = values.filter((v) => v >= target).length;
     el.historyChartFooter.textContent =
-      `Pointillés : objectif de ${formatNumber(target, 1)} %, atteint ${reached} ${plural(reached, "fois", "fois")} sur ${days.length}.`;
+      `Pointillés : objectif de ${formatNumber(target / 100, 2)}, atteint ${reached} ${plural(reached, "fois", "fois")} sur ${days.length}.`;
   }
 
   function shareText(entry) {
     const lines = [`Rendement – ${capitalize(entry.dateLabel)}`];
     const c = entry.calc;
-    if (c && c.rendement != null) lines.push(`Rendement : ${formatNumber(c.rendement, 1)} %`);
+    if (c && c.rendement != null) lines.push(`Rendement : ${formatRatio(c.rendement)}`);
     if (c) {
       lines.push(`Minutes produites : ${formatNumber(c.produced, 1)} min`);
       const prod = (c.items || []).map((i) => `${i.label} ${formatNumber(i.qty, 2)}`).join(", ");
@@ -925,7 +932,7 @@
       list.className = "list";
 
       if (entry.calc && entry.calc.rendement != null) {
-        list.appendChild(historyRow("Rendement", `${formatNumber(entry.calc.rendement, 1)} %`, { strong: true }));
+        list.appendChild(historyRow("Rendement", formatRatio(entry.calc.rendement), { strong: true }));
       }
       const minutedDetail = entry.items.map((i) => `${i.label} ${minutesOf(i.ms)}`).join(" · ");
       list.appendChild(historyRow("Minutes minutées", formatMinutes(entry.totalMs), { subtitle: minutedDetail }));
