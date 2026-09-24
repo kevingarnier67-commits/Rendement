@@ -32,6 +32,7 @@
   <symbol id="i-check" viewBox="0 0 256 256"><path d="M232.49,80.49l-128,128a12,12,0,0,1-17,0l-56-56a12,12,0,1,1,17-17L96,183,215.51,63.51a12,12,0,0,1,17,17Z"/></symbol>
   <symbol id="i-arrow-right" viewBox="0 0 256 256"><path d="M224.49,136.49l-72,72a12,12,0,0,1-17-17L187,140H40a12,12,0,0,1,0-24H187L135.51,64.48a12,12,0,0,1,17-17l72,72A12,12,0,0,1,224.49,136.49Z"/></symbol>
   <symbol id="i-caret-right" viewBox="0 0 256 256"><path d="M184.49,136.49l-80,80a12,12,0,0,1-17-17L159,128,87.51,56.49a12,12,0,1,1,17-17l80,80A12,12,0,0,1,184.49,136.49Z"/></symbol>
+  <symbol id="i-download" viewBox="0 0 256 256"><path d="M71.51,88.49a12,12,0,0,1,17-17L116,99V24a12,12,0,0,1,24,0V99l27.51-27.52a12,12,0,0,1,17,17l-48,48a12,12,0,0,1-17,0ZM224,116H188a12,12,0,0,0,0,24h32v56H36V140H68a12,12,0,0,0,0-24H32a20,20,0,0,0-20,20v64a20,20,0,0,0,20,20H224a20,20,0,0,0,20-20V136A20,20,0,0,0,224,116Zm-20,52a16,16,0,1,0-16,16A16,16,0,0,0,204,168Z"/></symbol>
   <symbol id="i-trash" viewBox="0 0 256 256"><path d="M216,48H180V36A28,28,0,0,0,152,8H104A28,28,0,0,0,76,36V48H40a12,12,0,0,0,0,24h4V208a20,20,0,0,0,20,20H192a20,20,0,0,0,20-20V72h4a12,12,0,0,0,0-24ZM100,36a4,4,0,0,1,4-4h48a4,4,0,0,1,4,4V48H100Zm88,168H68V72H188ZM116,104v64a12,12,0,0,1-24,0V104a12,12,0,0,1,24,0Zm48,0v64a12,12,0,0,1-24,0V104a12,12,0,0,1,24,0Z"/></symbol>
   <symbol id="i-pencil-simple" viewBox="0 0 256 256"><path d="M230.14,70.54,185.46,25.85a20,20,0,0,0-28.29,0L33.86,149.17A19.85,19.85,0,0,0,28,163.31V208a20,20,0,0,0,20,20H92.69a19.86,19.86,0,0,0,14.14-5.86L230.14,98.82a20,20,0,0,0,0-28.28ZM91,204H52V165l84-84,39,39ZM192,103,153,64l18.34-18.34,39,39Z"/></symbol>
   <symbol id="i-export" viewBox="0 0 256 256"><path d="M220,112v96a20,20,0,0,1-20,20H56a20,20,0,0,1-20-20V112A20,20,0,0,1,56,92H76a12,12,0,0,1,0,24H60v88H196V116H180a12,12,0,0,1,0-24h20A20,20,0,0,1,220,112ZM96.49,72.49,116,53v83a12,12,0,0,0,24,0V53l19.51,19.52a12,12,0,1,0,17-17l-40-40a12,12,0,0,0-17,0l-40,40a12,12,0,1,0,17,17Z"/></symbol>
@@ -131,9 +132,17 @@
   <section class="group" aria-labelledby="result-header">
     <h2 id="result-header" class="group-header">Rendement</h2>
     <div class="list">
-      <div class="result">
-        <p id="calc-rendement" class="result-value">--</p>
-        <div class="progress" aria-hidden="true"><span id="calc-gauge" class="progress-fill"></span></div>
+      <div id="calc-result" class="result">
+        <div class="ring" aria-hidden="true">
+          <svg class="ring-svg" viewBox="0 0 120 120" focusable="false">
+            <circle class="ring-track" cx="60" cy="60" r="52"/>
+            <circle id="calc-ring" class="ring-fill" cx="60" cy="60" r="52"/>
+          </svg>
+        </div>
+        <div class="result-text">
+          <p id="calc-rendement" class="result-value">--</p>
+          <p id="calc-gap" class="result-gap">Saisis ta production pour voir ton rendement.</p>
+        </div>
       </div>
       <div class="row">
         <span class="row-title">Minutes produites</span>
@@ -142,6 +151,13 @@
       <div class="row">
         <span class="row-title">Temps de production</span>
         <span id="calc-net-2" class="row-value">455 min</span>
+      </div>
+      <div class="row">
+        <label for="calc-target" class="row-title">Objectif</label>
+        <span class="row-trailing">
+          <input type="text" inputmode="decimal" id="calc-target" class="field field-sm" autocomplete="off" />
+          <span class="row-unit">%</span>
+        </span>
       </div>
     </div>
   </section>
@@ -160,6 +176,21 @@
 <!-- ===================== HISTORIQUE ===================== -->
 <main id="view-history" class="view" data-title="Historique">
   <header class="large-title"><h1>Historique</h1></header>
+
+  <section id="history-summary" class="group" aria-labelledby="summary-header" hidden>
+    <h2 id="summary-header" class="group-header">Dernières journées</h2>
+    <div class="list">
+      <div class="chart-card">
+        <div class="chart-head">
+          <span class="chart-kicker">Moyenne</span>
+          <span id="history-avg" class="chart-avg">--</span>
+        </div>
+        <div id="history-chart" class="chart" role="img"></div>
+      </div>
+    </div>
+    <p id="history-chart-footer" class="group-footer"></p>
+  </section>
+
   <div id="history-list"></div>
   <div id="history-empty" class="unavailable">
     <svg class="icon unavailable-icon" aria-hidden="true"><use href="#i-clock-counter-clockwise"/></svg>
@@ -167,13 +198,33 @@
     <p class="unavailable-text">En fin de poste, ouvre Calcul et touche « Enregistrer la journée ».</p>
     <button type="button" id="btn-empty-go" class="btn-tinted">Ouvrir Calcul</button>
   </div>
+
+  <section class="group" aria-labelledby="backup-header">
+    <h2 id="backup-header" class="group-header">Sauvegarde</h2>
+    <div class="list">
+      <button type="button" id="btn-export" class="row row-action">
+        <svg class="icon" aria-hidden="true"><use href="#i-export"/></svg>
+        <span>Exporter une sauvegarde</span>
+      </button>
+      <button type="button" id="btn-import" class="row row-action">
+        <svg class="icon" aria-hidden="true"><use href="#i-download"/></svg>
+        <span>Importer une sauvegarde</span>
+      </button>
+    </div>
+    <p class="group-footer">Tes données restent sur cet iPhone. Exporte une sauvegarde pour les garder à l'abri ou les passer sur un autre téléphone.</p>
+    <input type="file" id="import-file" class="visually-hidden" accept="application/json,.json" tabindex="-1" aria-hidden="true" />
+  </section>
 </main>
 
 <!-- ===================== BARRE D'ONGLETS (verre) ===================== -->
 <nav class="tabbar" aria-label="Sections">
   <button type="button" class="tab" data-view="view-timer">
-    <svg class="icon" aria-hidden="true"><use href="#i-timer"/></svg>
+    <span class="tab-icon">
+      <svg class="icon" aria-hidden="true"><use href="#i-timer"/></svg>
+      <span id="tab-running" class="tab-dot" hidden></span>
+    </span>
     <span>Minuteur</span>
+    <span id="tab-running-sr" class="visually-hidden" hidden>, chrono en cours</span>
   </button>
   <button type="button" class="tab" data-view="view-calc">
     <svg class="icon" aria-hidden="true"><use href="#i-calculator"/></svg>

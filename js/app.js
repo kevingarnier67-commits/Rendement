@@ -43,6 +43,7 @@
     { id: "mfv", label: "MFV", refQty: "", refMin: "" },
   ];
   const RATES_VERSION = 1;
+  const DEFAULT_TARGET = "100";
 
   // Les cadences sont mémorisées d'un jour à l'autre ; seules les quantités (qty) sont remises à zéro.
   function freshCalc() {
@@ -51,6 +52,7 @@
       products: DEFAULT_PRODUCTS.map((p) => ({ ...p, builtin: true })),
       qty: {},
       ratesVersion: RATES_VERSION,
+      target: DEFAULT_TARGET,
     };
   }
 
@@ -86,6 +88,8 @@
       });
       next.ratesVersion = RATES_VERSION;
     }
+    if (next.target == null) next.target = DEFAULT_TARGET;
+    if (!next.qty || typeof next.qty !== "object") next.qty = {};
     return next;
   }
 
@@ -115,16 +119,23 @@
     };
   }
 
+  // Vérifie et complète un état lu (stockage local ou fichier de sauvegarde). null si invalide.
+  function normalizeState(s) {
+    if (!s || !Array.isArray(s.categories) || !s.categories.every((c) => c && c.id && c.label)) return null;
+    s.calc = normalizeCalc(s.calc);
+    normalizeCategories(s.categories);
+    if (!s.totals || typeof s.totals !== "object") s.totals = {};
+    if (!Array.isArray(s.history)) s.history = [];
+    if (s.active && !(s.active.id && s.active.startedAt)) s.active = null;
+    return s;
+  }
+
   function load() {
     try {
       const raw = localStorage.getItem(KEY);
       if (raw) {
-        const s = JSON.parse(raw);
-        if (s && Array.isArray(s.categories)) {
-          s.calc = normalizeCalc(s.calc);
-          normalizeCategories(s.categories);
-          return s;
-        }
+        const s = normalizeState(JSON.parse(raw));
+        if (s) return s;
       }
       // migration depuis la version précédente (3 catégories fixes, pas d'historique)
       const old = localStorage.getItem(OLD_KEY);
@@ -230,7 +241,19 @@
     calcAddProduct: $("btn-add-product"),
     calcProduced: $("calc-produced"),
     calcRendement: $("calc-rendement"),
-    calcGauge: $("calc-gauge"),
+    calcResult: $("calc-result"),
+    calcRing: $("calc-ring"),
+    calcGap: $("calc-gap"),
+    calcTarget: $("calc-target"),
+    historySummary: $("history-summary"),
+    historyAvg: $("history-avg"),
+    historyChart: $("history-chart"),
+    historyChartFooter: $("history-chart-footer"),
+    exportBtn: $("btn-export"),
+    importBtn: $("btn-import"),
+    importFile: $("import-file"),
+    tabRunning: $("tab-running"),
+    tabRunningSr: $("tab-running-sr"),
     calcClear: $("btn-calc-clear"),
     historyList: $("history-list"),
     historyEmpty: $("history-empty"),
@@ -519,6 +542,9 @@
     }
 
     el.grandTotal.textContent = `${minutedMinutes()} min`;
+    el.tabRunning.hidden = !activeCat;
+    el.tabRunningSr.hidden = !activeCat;
+    setTone(el.tabRunning, activeCat ? activeCat.tone : null);
     renderCalcResults();
   }
 
@@ -545,7 +571,20 @@
       .filter((i) => i.qty > 0);
     const produced = items.reduce((acc, i) => acc + i.minutes, 0);
     const rendement = net > 0 && produced > 0 ? (produced / net) * 100 : null;
-    return { base, minuted, net, produced, rendement, items };
+    const target = parseNum(state.calc.target) > 0 ? parseNum(state.calc.target) : parseNum(DEFAULT_TARGET);
+    return { base, minuted, net, produced, rendement, target, items };
+  }
+
+  const RING_LENGTH = 2 * Math.PI * 52;
+
+  // Ce qu'il reste à produire pour atteindre l'objectif, en minutes.
+  function gapText(c) {
+    const t = formatNumber(c.target, 1);
+    if (c.net <= 0) return "Plus de temps de production : vérifie la base et les minutes minutées.";
+    if (c.rendement == null) return `Saisis ta production pour voir ton rendement. Objectif : ${t} %.`;
+    const missing = (c.net * c.target) / 100 - c.produced;
+    if (missing > 0.05) return `Encore ${formatNumber(missing, 1)} min de production pour atteindre ${t} %.`;
+    return `Objectif de ${t} % atteint.`;
   }
 
   function renderCalcResults() {
@@ -555,7 +594,11 @@
     el.calcNet2.textContent = `${formatNumber(c.net, 1)} min`;
     el.calcProduced.textContent = `${formatNumber(c.produced, 1)} min`;
     el.calcRendement.textContent = c.rendement == null ? "--" : `${formatNumber(c.rendement, 1)} %`;
-    el.calcGauge.style.width = `${Math.min(c.rendement || 0, 100)}%`;
+    const progress = Math.min((c.rendement || 0) / c.target, 1);
+    el.calcRing.style.strokeDasharray = `${RING_LENGTH}`;
+    el.calcRing.style.strokeDashoffset = `${RING_LENGTH * (1 - progress)}`;
+    el.calcResult.classList.toggle("is-reached", c.rendement != null && c.rendement >= c.target);
+    el.calcGap.textContent = gapText(c);
     state.calc.products.forEach((p) => {
       const row = el.calcProducts.querySelector(`[data-prod="${p.id}"]`);
       if (!row) return;
@@ -576,6 +619,7 @@
 
   function renderCalcProducts() {
     el.calcBase.value = state.calc.base;
+    el.calcTarget.value = state.calc.target;
     el.calcProducts.innerHTML = "";
     state.calc.products.forEach((p, idx) => {
       const row = document.createElement("div");
@@ -711,6 +755,13 @@
     renderCalcResults();
   });
 
+  bindNumeric(el.calcTarget, decimalOnly, (v) => {
+    state.calc.target = v;
+    persist();
+    renderCalcResults();
+    renderHistory();
+  });
+
   el.calcAddProduct.addEventListener("click", async () => {
     const label = await ask({
       title: "Nouvelle matière",
@@ -778,7 +829,90 @@
     return row;
   }
 
+  // Graphique des dernières journées (7 max), de la plus ancienne à la plus récente.
+  function renderChart() {
+    const days = state.history.filter((e) => e.calc && e.calc.rendement != null).slice(0, 7).reverse();
+    el.historySummary.hidden = days.length === 0;
+    if (!days.length) return;
+    const target = computeCalc().target;
+    const values = days.map((d) => d.calc.rendement);
+    const avg = values.reduce((a, b) => a + b, 0) / values.length;
+    const top = Math.max(target * 1.15, ...values.map((v) => v * 1.08));
+    el.historyAvg.textContent = `${formatNumber(avg, 1)} %`;
+    el.historyChart.innerHTML = "";
+
+    const plot = document.createElement("div");
+    plot.className = "chart-plot";
+    const line = document.createElement("span");
+    line.className = "chart-target";
+    line.style.bottom = `${(target / top) * 100}%`;
+    plot.appendChild(line);
+    const labels = document.createElement("div");
+    labels.className = "chart-labels";
+
+    days.forEach((d) => {
+      const r = d.calc.rendement;
+      const col = document.createElement("div");
+      col.className = "chart-col";
+      const bar = document.createElement("span");
+      bar.className = "chart-bar" + (r >= target ? " is-reached" : "");
+      bar.style.height = `${Math.max((r / top) * 100, 2)}%`;
+      const val = document.createElement("span");
+      val.className = "chart-val";
+      val.style.bottom = `calc(${(r / top) * 100}% + 4px)`;
+      val.textContent = `${Math.round(r)} %`;
+      col.append(bar, val);
+      plot.appendChild(col);
+
+      const date = new Date(d.savedAt);
+      const lab = document.createElement("span");
+      lab.className = "chart-day";
+      lab.innerHTML = `<span></span><span></span>`;
+      lab.children[0].textContent = date.toLocaleDateString("fr-FR", { weekday: "short" });
+      lab.children[1].textContent = date.getDate();
+      labels.appendChild(lab);
+    });
+    el.historyChart.append(plot, labels);
+    el.historyChart.setAttribute("aria-label", "Rendement des dernières journées : " +
+      days.map((d) => `${d.dateLabel} ${formatNumber(d.calc.rendement, 1)} %`).join(", ") +
+      `. Moyenne ${formatNumber(avg, 1)} %.`);
+    const reached = values.filter((v) => v >= target).length;
+    el.historyChartFooter.textContent =
+      `Pointillés : objectif de ${formatNumber(target, 1)} %, atteint ${reached} ${plural(reached, "fois", "fois")} sur ${days.length}.`;
+  }
+
+  function shareText(entry) {
+    const lines = [`Rendement – ${capitalize(entry.dateLabel)}`];
+    const c = entry.calc;
+    if (c && c.rendement != null) lines.push(`Rendement : ${formatNumber(c.rendement, 1)} %`);
+    if (c) {
+      lines.push(`Minutes produites : ${formatNumber(c.produced, 1)} min`);
+      const prod = (c.items || []).map((i) => `${i.label} ${formatNumber(i.qty, 2)}`).join(", ");
+      if (prod) lines.push(`Production : ${prod}`);
+      lines.push(`Temps de production : ${formatNumber(c.net, 1)} min (${formatNumber(c.base, 1)} − ${c.minuted} min minutées)`);
+    }
+    lines.push(`Minutes minutées : ${formatMinutes(entry.totalMs)}`);
+    entry.items.forEach((i) => lines.push(`  ${i.label} : ${minutesOf(i.ms)} min`));
+    return lines.join("\n");
+  }
+
+  async function shareEntry(entry) {
+    const text = shareText(entry);
+    if (navigator.share) {
+      try { await navigator.share({ title: "Rendement", text }); return; } catch (e) {
+        if (e && e.name === "AbortError") return;
+      }
+    }
+    try {
+      await navigator.clipboard.writeText(text);
+      toast("Résumé copié");
+    } catch (e) {
+      toast("Partage impossible sur cet appareil");
+    }
+  }
+
   function renderHistory() {
+    renderChart();
     el.historyList.innerHTML = "";
     el.historyEmpty.hidden = state.history.length > 0;
     state.history.forEach((entry) => {
@@ -802,6 +936,13 @@
         list.appendChild(historyRow("Temps de production", `${formatNumber(c.net, 1)} min`,
           { subtitle: `${formatNumber(c.base, 1)} − ${c.minuted} min minutées` }));
       }
+      const share = document.createElement("button");
+      share.type = "button";
+      share.className = "row row-action";
+      share.innerHTML = `${icon("export")}<span>Partager</span>`;
+      share.addEventListener("click", () => shareEntry(entry));
+      list.appendChild(share);
+
       const del = document.createElement("button");
       del.type = "button";
       del.className = "row row-destructive";
@@ -921,6 +1062,57 @@
     render();
     renderCustomCats();
     toast(`${label} ajouté`);
+  });
+
+  // ---------- sauvegarde ----------
+  el.exportBtn.addEventListener("click", async () => {
+    const day = new Date().toISOString().slice(0, 10);
+    const name = `rendement-sauvegarde-${day}.json`;
+    const data = JSON.stringify({ app: "rendement", version: 1, exportedAt: Date.now(), state }, null, 2);
+    const file = new File([data], name, { type: "application/json" });
+    if (navigator.canShare && navigator.canShare({ files: [file] })) {
+      try { await navigator.share({ files: [file], title: "Sauvegarde Rendement" }); return; } catch (e) {
+        if (e && e.name === "AbortError") return;
+      }
+    }
+    const url = URL.createObjectURL(file);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = name;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    toast("Sauvegarde exportée");
+  });
+
+  el.importBtn.addEventListener("click", () => el.importFile.click());
+
+  el.importFile.addEventListener("change", async () => {
+    const f = el.importFile.files && el.importFile.files[0];
+    el.importFile.value = "";
+    if (!f) return;
+    let next = null;
+    try {
+      const parsed = JSON.parse(await f.text());
+      next = normalizeState(parsed && parsed.state ? parsed.state : parsed);
+    } catch (e) { next = null; }
+    if (!next) { toast("Ce fichier n'est pas une sauvegarde Rendement"); return; }
+    const days = next.history.length;
+    const ok = await ask({
+      title: "Remplacer les données ?",
+      text: `Les postes, compteurs, cadences et l'historique de cet iPhone seront remplacés par la sauvegarde (${days} ${plural(days, "journée", "journées")}).`,
+      confirmLabel: "Remplacer les données",
+      danger: true,
+    });
+    if (!ok) return;
+    state = next;
+    persist();
+    renderCats();
+    renderCalcProducts();
+    render();
+    renderHistory();
+    toast("Sauvegarde importée");
   });
 
   // ---------- chrono en direct ----------
