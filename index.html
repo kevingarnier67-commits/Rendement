@@ -2,7 +2,7 @@
 <html lang="fr">
 <head>
 <meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
 <title>Rendement</title>
 
 <!-- PWA / iOS home screen -->
@@ -46,7 +46,7 @@
         <span class="grand-total-label">Total non-productif</span>
         <span id="grand-total" class="grand-total-value">0 min</span>
       </div>
-      <button type="button" id="btn-save-day" class="btn-save-day">✓ Enregistrer la journée</button>
+      <button type="button" id="btn-finish" class="btn-finish">Terminer la journée →</button>
       <button type="button" id="btn-reset" class="btn-reset">Remettre à zéro sans enregistrer</button>
     </footer>
 
@@ -90,6 +90,8 @@
       <span class="calc-formula">minutes produites ÷ temps de production</span>
     </section>
 
+    <button type="button" id="btn-save-day" class="btn-save-day calc-save">✓ Enregistrer la journée</button>
+
   </main>
 
   <!-- ===================== VUE HISTORIQUE ===================== -->
@@ -101,15 +103,15 @@
   <!-- ===================== BARRE D'ONGLETS ===================== -->
   <nav class="tabbar">
     <button type="button" class="tab-btn active" data-view="view-timer">
-      <span class="tab-icon">⏱</span>
+      <span class="tab-icon" aria-hidden="true">⏱</span>
       <span>Minuteur</span>
     </button>
     <button type="button" class="tab-btn" data-view="view-calc">
-      <span class="tab-icon">🧮</span>
+      <span class="tab-icon" aria-hidden="true">🧮</span>
       <span>Calcul</span>
     </button>
     <button type="button" class="tab-btn" data-view="view-history">
-      <span class="tab-icon">🗓</span>
+      <span class="tab-icon" aria-hidden="true">🗓</span>
       <span>Historique</span>
     </button>
   </nav>
@@ -134,7 +136,7 @@
   <div id="install-banner" class="install-banner hidden">
     <div class="install-head">
       <span class="install-title">📲 Installer l'app</span>
-      <button type="button" id="install-dismiss" class="install-dismiss">✕</button>
+      <button type="button" id="install-dismiss" class="install-dismiss" aria-label="Fermer">✕</button>
     </div>
     <div id="install-ios" class="install-body hidden">
       <p>Pour ajouter Rendement à ton écran d'accueil :</p>
@@ -150,7 +152,7 @@
     </div>
   </div>
 
-  <div id="toast" class="toast hidden"></div>
+  <div id="toast" class="toast hidden" role="status" aria-live="polite"></div>
 
 </div>
 

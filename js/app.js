@@ -155,6 +155,7 @@
     catList: $("cat-list"),
     grandTotal: $("grand-total"),
     saveDay: $("btn-save-day"),
+    finish: $("btn-finish"),
     reset: $("btn-reset"),
     manageCats: $("btn-manage-cats"),
     calcBase: $("calc-base"),
@@ -232,7 +233,7 @@
         </span>
         <span class="cat-right">
           <span class="cat-total">0 min</span>
-          <span class="cat-action">▶</span>
+          <span class="cat-action" aria-hidden="true">▶</span>
         </span>`;
       btn.querySelector(".cat-name").textContent = cat.label;
       btn.addEventListener("click", () => {
@@ -258,6 +259,7 @@
       const isActive = id === activeId;
       btn.classList.toggle("active", isActive);
       btn.querySelector(".cat-action").textContent = isActive ? "■" : "▶";
+      btn.setAttribute("aria-pressed", isActive ? "true" : "false");
       btn.querySelector(".cat-total").textContent = formatMinutes(liveTotalOf(id));
     });
 
@@ -357,6 +359,8 @@
           <span class="prod-total">= 0 min</span>
         </div>`;
       row.querySelector(".prod-name").textContent = p.label;
+      row.querySelector(".prod-delete").setAttribute("aria-label", `Supprimer ${p.label}`);
+      row.querySelector(".prod-qty-input").setAttribute("aria-label", `Quantité ${p.label}`);
       const rateQty = row.querySelector(".prod-rate-qty");
       const rateMin = row.querySelector(".prod-rate-min");
       const qty = row.querySelector(".prod-qty-input");
@@ -391,14 +395,15 @@
   }
 
   el.saveDay.addEventListener("click", () => {
+    const hasMinutes = minutedMinutes() > 0;
+    if (!hasMinutes && computeCalc().produced === 0) { toast("Rien à enregistrer"); return; }
+    if (!confirm("Enregistrer la journée dans l'historique et remettre les compteurs à zéro ?")) return;
     stopActive();
     const items = state.categories
       .map((c) => ({ label: c.label, color: c.color, ms: totalOf(c.id) }))
       .filter((i) => minutesOf(i.ms) > 0);
     const totalMs = items.reduce((acc, i) => acc + minutesOf(i.ms) * 60000, 0);
     const calc = computeCalc();
-    if (totalMs === 0 && calc.produced === 0) { toast("Rien à enregistrer"); return; }
-    if (!confirm("Enregistrer la journée dans l'historique et remettre les compteurs à zéro ?")) return;
     const now = new Date();
     state.history.unshift({
       id: uuid(),
@@ -413,8 +418,11 @@
     renderCalcProducts();
     renderHistory();
     render();
+    showView("view-history");
     toast("Journée enregistrée ✓");
   });
+
+  el.finish.addEventListener("click", () => showView("view-calc"));
 
   el.calcBase.addEventListener("input", () => {
     state.calc.base = el.calcBase.value;
@@ -542,13 +550,18 @@
   }
 
   // ---------- tabs ----------
-  document.querySelectorAll(".tab-btn").forEach((btn) => {
-    btn.addEventListener("click", () => {
-      document.querySelectorAll(".tab-btn").forEach((b) => b.classList.remove("active"));
-      document.querySelectorAll(".view").forEach((v) => v.classList.remove("active"));
-      btn.classList.add("active");
-      $(btn.dataset.view).classList.add("active");
+  function showView(viewId) {
+    document.querySelectorAll(".tab-btn").forEach((b) => {
+      const on = b.dataset.view === viewId;
+      b.classList.toggle("active", on);
+      if (on) b.setAttribute("aria-current", "page"); else b.removeAttribute("aria-current");
     });
+    document.querySelectorAll(".view").forEach((v) => v.classList.toggle("active", v.id === viewId));
+    window.scrollTo(0, 0);
+  }
+
+  document.querySelectorAll(".tab-btn").forEach((btn) => {
+    btn.addEventListener("click", () => showView(btn.dataset.view));
   });
 
   // ---------- category management ----------
@@ -576,6 +589,7 @@
       del.type = "button";
       del.className = "custom-cat-delete";
       del.textContent = "✕";
+      del.setAttribute("aria-label", `Supprimer ${cat.label}`);
       del.addEventListener("click", () => {
         const hasTime = totalOf(cat.id) > 0 || (state.active && state.active.id === cat.id);
         const msg = hasTime
@@ -627,6 +641,7 @@
   renderCalcProducts();
   render();
   renderHistory();
+  showView("view-timer");
 
   // ---------- bannière d'installation ----------
   const INSTALL_DISMISS_KEY = "rendement.installDismissed.v1";
