@@ -4,16 +4,18 @@
   const KEY = "rendement.app.v3";
   const OLD_KEY = "rendement.timer.v2";
 
-  // Tons de voyant (andon) : la couleur réelle dépend du thème, voir css/style.css.
-  const TONES = ["blue", "violet", "orange", "teal", "pink", "amber", "green", "cyan"];
-  const LEGACY_COLOR_TONES = {
-    "#4da3ff": "blue", "#b07cff": "violet", "#ff9d42": "orange", "#2fd4b5": "teal",
-    "#ff6b9d": "pink", "#ffd84d": "amber", "#6ee7a0": "green", "#ff8360": "cyan",
+  // Couleurs système iOS (la valeur exacte dépend du thème, voir css/style.css).
+  const TONES = ["blue", "purple", "orange", "teal", "pink", "yellow", "green", "indigo"];
+  // Anciennes couleurs (hex de la 1re version, noms de la version précédente) → couleurs iOS.
+  const LEGACY_TONES = {
+    "#4da3ff": "blue", "#b07cff": "purple", "#ff9d42": "orange", "#2fd4b5": "teal",
+    "#ff6b9d": "pink", "#ffd84d": "yellow", "#6ee7a0": "green", "#ff8360": "indigo",
+    violet: "purple", amber: "yellow", cyan: "indigo",
   };
 
   const DEFAULT_CATEGORIES = [
     { id: "cms", label: "TEMPS CMS", tone: "blue", builtin: true },
-    { id: "cf", label: "TEMPS CF", tone: "violet", builtin: true },
+    { id: "cf", label: "TEMPS CF", tone: "purple", builtin: true },
     { id: "rep", label: "TEMPS RÉPARATION", tone: "orange", builtin: true },
   ];
 
@@ -23,8 +25,9 @@
   }
 
   function toneOf(item) {
-    if (item && TONES.includes(item.tone)) return item.tone;
-    return (item && LEGACY_COLOR_TONES[String(item.color || "").toLowerCase()]) || null;
+    if (!item) return null;
+    if (TONES.includes(item.tone)) return item.tone;
+    return LEGACY_TONES[item.tone] || LEGACY_TONES[String(item.color || "").toLowerCase()] || null;
   }
 
   const DEFAULT_BASE = 455;
@@ -192,14 +195,27 @@
     if (tone) node.classList.add(`tone-${tone}`);
   }
 
+  function capitalize(s) { return s ? s.charAt(0).toUpperCase() + s.slice(1) : s; }
+
+  function plural(n, one, many) { return n < 2 ? one : many; }
+
+  function rateLabel(p) {
+    const q = parseNum(p.refQty);
+    const m = parseNum(p.refMin);
+    if (!(q > 0 && m > 0)) return null;
+    return `${formatNumber(q, 2)} ${plural(q, "pièce", "pièces")} en ${formatNumber(m, 2)} min`;
+  }
+
   // ---------- DOM ----------
   const $ = (id) => document.getElementById(id);
   const el = {
     date: $("today-date"),
-    clock: document.querySelector(".clock"),
+    navbar: $("navbar"),
+    navbarTitle: $("navbar-title"),
+    stopwatch: document.querySelector(".stopwatch"),
     statusText: $("clock-status-text"),
     time: $("clock-time"),
-    hint: $("clock-hint"),
+    stop: $("btn-stop"),
     catList: $("cat-list"),
     grandTotal: $("grand-total"),
     saveDay: $("btn-save-day"),
@@ -226,33 +242,110 @@
     customCatSection: $("custom-cat-section"),
     customCatList: $("custom-cat-list"),
     dlgCatsClose: $("dlg-cats-close"),
-    dlgAsk: $("dlg-ask"),
-    formAsk: $("form-ask"),
-    askTitle: $("dlg-ask-title"),
-    askText: $("dlg-ask-text"),
-    askField: $("dlg-ask-field"),
-    askLabel: $("dlg-ask-label"),
-    askInput: $("dlg-ask-input"),
-    askError: $("dlg-ask-error"),
-    askCancel: $("dlg-ask-cancel"),
-    askOk: $("dlg-ask-ok"),
+    dlgRate: $("dlg-rate"),
+    formRate: $("form-rate"),
+    rateTitle: $("dlg-rate-title"),
+    rateQty: $("rate-qty"),
+    rateMin: $("rate-min"),
+    rateHint: $("rate-hint"),
+    rateCancel: $("dlg-rate-cancel"),
+    rateDeleteSection: $("rate-delete-section"),
+    rateDelete: $("rate-delete"),
+    dlgAlert: $("dlg-alert"),
+    formAlert: $("form-alert"),
+    alertTitle: $("alert-title"),
+    alertText: $("alert-text"),
+    alertField: $("alert-field"),
+    alertLabel: $("alert-label"),
+    alertInput: $("alert-input"),
+    alertError: $("alert-error"),
+    alertCancel: $("alert-cancel"),
+    alertOk: $("alert-ok"),
+    dlgAction: $("dlg-action"),
+    actionTitle: $("action-title"),
+    actionText: $("action-text"),
+    actionOk: $("action-ok"),
+    actionCancel: $("action-cancel"),
     toast: $("toast"),
+    toastText: $("toast-text"),
+    toastAction: $("toast-action"),
+    live: $("live"),
   };
 
-  el.date.textContent = new Date().toLocaleDateString("fr-FR", {
+  el.date.textContent = capitalize(new Date().toLocaleDateString("fr-FR", {
     weekday: "long", day: "numeric", month: "long",
-  });
+  }));
 
+  // Message éphémère, avec une action facultative (ex. Annuler).
   let toastTimeout = null;
-  function toast(msg) {
-    el.toast.textContent = msg;
+  let toastRun = null;
+  function hideToast() {
+    clearTimeout(toastTimeout);
+    el.toast.hidden = true;
+    toastRun = null;
+  }
+  function toast(msg, action = null) {
+    el.toastText.textContent = msg;
+    el.live.textContent = "";
+    requestAnimationFrame(() => {
+      el.live.textContent = action ? `${msg}. Bouton ${action.label} disponible.` : msg;
+    });
+    toastRun = action ? action.run : null;
+    el.toastAction.hidden = !action;
+    if (action) el.toastAction.textContent = action.label;
     el.toast.hidden = false;
     clearTimeout(toastTimeout);
-    toastTimeout = setTimeout(() => { el.toast.hidden = true; }, 3000);
+    toastTimeout = setTimeout(hideToast, action ? 8000 : 3000);
   }
+  el.toastAction.addEventListener("click", () => {
+    const run = toastRun;
+    hideToast();
+    if (run) run();
+  });
+  // Tant que le doigt ou le focus est sur le message, il reste affiché.
+  ["pointerenter", "focusin"].forEach((t) => el.toast.addEventListener(t, () => clearTimeout(toastTimeout)));
+  ["pointerleave", "focusout"].forEach((t) => el.toast.addEventListener(t, () => {
+    clearTimeout(toastTimeout);
+    toastTimeout = setTimeout(hideToast, 4000);
+  }));
 
-  // ---------- fenêtres (confirmation / saisie) ----------
-  const hasDialog = typeof HTMLDialogElement === "function" && typeof el.dlgAsk.showModal === "function";
+  // ---------- alertes et menus d'action ----------
+  const hasDialog = typeof HTMLDialogElement === "function" && typeof el.dlgAlert.showModal === "function";
+
+  function openDialog(d) { if (hasDialog) d.showModal(); else d.setAttribute("open", ""); }
+  function closeDialog(d) { if (hasDialog) { if (d.open) d.close(); } else d.removeAttribute("open"); }
+
+  // Feuille : glisser vers le bas depuis la poignée, ou toucher la zone assombrie, pour la fermer.
+  function makeDismissible(sheet, onDismiss) {
+    const handle = sheet.querySelector(".sheet-handle");
+    let startY = null;
+    let startT = 0;
+    let dy = 0;
+    handle.addEventListener("pointerdown", (e) => {
+      if (e.target.closest("button, input")) return;
+      startY = e.clientY;
+      startT = e.timeStamp;
+      dy = 0;
+      handle.setPointerCapture(e.pointerId);
+      sheet.classList.add("is-dragging");
+    });
+    handle.addEventListener("pointermove", (e) => {
+      if (startY === null) return;
+      dy = Math.max(0, e.clientY - startY);
+      sheet.style.transform = `translateY(${dy}px)`;
+    });
+    const end = (e) => {
+      if (startY === null) return;
+      const speed = dy / Math.max(1, e.timeStamp - startT);
+      startY = null;
+      sheet.classList.remove("is-dragging");
+      sheet.style.transform = "";
+      if (dy > 110 || (dy > 30 && speed > 0.6)) onDismiss();
+    };
+    handle.addEventListener("pointerup", end);
+    handle.addEventListener("pointercancel", end);
+    sheet.addEventListener("click", (e) => { if (e.target === sheet) onDismiss(); });
+  }
 
   function showFieldError(input, errorEl, message) {
     errorEl.textContent = message || "";
@@ -261,6 +354,7 @@
     if (message) input.setAttribute("aria-invalid", "true"); else input.removeAttribute("aria-invalid");
   }
 
+  // Action destructive → menu d'action (bas d'écran) ; confirmation ou saisie → alerte.
   // Renvoie true / la valeur saisie si confirmé, null si annulé.
   function ask({ title, text = "", confirmLabel, danger = false, input = null }) {
     if (!hasDialog) {
@@ -272,48 +366,71 @@
       }
       return Promise.resolve(confirm(text ? `${title}\n\n${text}` : title) || null);
     }
+    if (danger && !input) return askAction({ title, text, confirmLabel });
     return new Promise((resolve) => {
-      el.askTitle.textContent = title;
-      el.askText.textContent = text;
-      el.askOk.textContent = confirmLabel;
-      el.askOk.classList.toggle("is-danger", danger);
-      el.askField.hidden = !input;
-      showFieldError(el.askInput, el.askError, "");
+      el.alertTitle.textContent = title;
+      el.alertText.textContent = text;
+      el.alertOk.textContent = confirmLabel;
+      el.alertField.hidden = !input;
+      showFieldError(el.alertInput, el.alertError, "");
       if (input) {
-        el.askLabel.textContent = input.label;
-        el.askInput.placeholder = input.placeholder || "";
-        el.askInput.value = "";
+        el.alertLabel.textContent = input.label;
+        el.alertInput.placeholder = input.placeholder || "";
+        el.alertInput.value = "";
       }
-
       const finish = (value) => {
-        el.formAsk.removeEventListener("submit", onSubmit);
-        el.askCancel.removeEventListener("click", onCancel);
-        el.dlgAsk.removeEventListener("cancel", onCancel);
-        el.askInput.removeEventListener("input", onType);
-        if (el.dlgAsk.open) el.dlgAsk.close();
+        el.formAlert.removeEventListener("submit", onSubmit);
+        el.alertCancel.removeEventListener("click", onCancel);
+        el.dlgAlert.removeEventListener("cancel", onCancel);
+        el.alertInput.removeEventListener("input", onType);
+        closeDialog(el.dlgAlert);
         resolve(value);
       };
       const onSubmit = (e) => {
         e.preventDefault();
         if (!input) { finish(true); return; }
-        const v = el.askInput.value.trim();
+        const v = el.alertInput.value.trim();
         const err = v ? (input.validate && input.validate(v)) : input.emptyMessage;
-        if (err) { showFieldError(el.askInput, el.askError, err); el.askInput.focus(); return; }
+        if (err) { showFieldError(el.alertInput, el.alertError, err); el.alertInput.focus(); return; }
         finish(v);
       };
       const onCancel = (e) => { if (e) e.preventDefault(); finish(null); };
-      const onType = () => showFieldError(el.askInput, el.askError, "");
-
-      el.formAsk.addEventListener("submit", onSubmit);
-      el.askCancel.addEventListener("click", onCancel);
-      el.dlgAsk.addEventListener("cancel", onCancel);
-      el.askInput.addEventListener("input", onType);
-      el.dlgAsk.showModal();
-      (input ? el.askInput : el.askCancel).focus();
+      const onType = () => showFieldError(el.alertInput, el.alertError, "");
+      el.formAlert.addEventListener("submit", onSubmit);
+      el.alertCancel.addEventListener("click", onCancel);
+      el.dlgAlert.addEventListener("cancel", onCancel);
+      el.alertInput.addEventListener("input", onType);
+      openDialog(el.dlgAlert);
+      (input ? el.alertInput : el.alertCancel).focus();
     });
   }
 
-  // ---------- timer logic ----------
+  function askAction({ title, text, confirmLabel }) {
+    return new Promise((resolve) => {
+      el.actionTitle.textContent = title;
+      el.actionText.textContent = text;
+      el.actionOk.textContent = confirmLabel;
+      const finish = (value) => {
+        el.actionOk.removeEventListener("click", onOk);
+        el.actionCancel.removeEventListener("click", onCancel);
+        el.dlgAction.removeEventListener("cancel", onCancel);
+        el.dlgAction.removeEventListener("click", onBackdrop);
+        closeDialog(el.dlgAction);
+        resolve(value);
+      };
+      const onOk = () => finish(true);
+      const onCancel = (e) => { if (e) e.preventDefault(); finish(null); };
+      const onBackdrop = (e) => { if (e.target === el.dlgAction) finish(null); };
+      el.actionOk.addEventListener("click", onOk);
+      el.actionCancel.addEventListener("click", onCancel);
+      el.dlgAction.addEventListener("cancel", onCancel);
+      el.dlgAction.addEventListener("click", onBackdrop);
+      openDialog(el.dlgAction);
+      el.actionCancel.focus();
+    });
+  }
+
+  // ---------- chrono ----------
   function totalOf(id) { return state.totals[id] || 0; }
 
   function activeElapsed() {
@@ -336,30 +453,31 @@
     return totalOf(id) + (state.active && state.active.id === id ? activeElapsed() : 0);
   }
 
-  // Somme des minutes affichées par catégorie, pour que le total colle toujours au détail.
+  // Somme des minutes affichées par poste, pour que le total colle toujours au détail.
   function minutedMinutes() {
     return state.categories.reduce((acc, c) => acc + minutesOf(liveTotalOf(c.id)), 0);
   }
 
-  // ---------- catégories (voyants andon) ----------
+  // ---------- postes ----------
   function renderCats() {
     el.catList.innerHTML = "";
     state.categories.forEach((cat) => {
       const btn = document.createElement("button");
       btn.type = "button";
-      btn.className = "cat";
+      btn.className = "row cat";
       btn.dataset.cat = cat.id;
       setTone(btn, cat.tone);
       btn.innerHTML = `
-        <span class="cat-swatch" aria-hidden="true"></span>
-        <span class="cat-text">
-          <span class="cat-name"></span>
-          <span class="cat-sub" hidden>En cours</span>
+        <span class="row-icon" aria-hidden="true">${icon("timer")}</span>
+        <span class="row-text">
+          <span class="row-title cat-name"></span>
+          <span class="row-subtitle cat-sub" hidden>En cours</span>
         </span>
-        <span class="cat-min">0 min</span>
-        <span class="cat-btn" aria-hidden="true">${icon("play")}</span>`;
+        <span class="row-value cat-min">0 min</span>
+        <span class="cat-toggle" aria-hidden="true">${icon("play")}</span>`;
       btn.querySelector(".cat-name").textContent = cat.label;
       btn.addEventListener("click", () => {
+        if (toastRun) hideToast();
         if (state.active && state.active.id === cat.id) {
           stopActive();
         } else {
@@ -372,7 +490,6 @@
     });
   }
 
-  // ---------- main render ----------
   function render() {
     const activeId = state.active ? state.active.id : null;
     const activeCat = activeId ? state.categories.find((c) => c.id === activeId) : null;
@@ -385,28 +502,29 @@
       btn.setAttribute("aria-pressed", isActive ? "true" : "false");
       btn.querySelector(".cat-sub").hidden = !isActive;
       if (isActive !== wasActive) {
-        btn.querySelector(".cat-btn use").setAttribute("href", isActive ? "#i-stop" : "#i-play");
+        btn.querySelector(".cat-toggle use").setAttribute("href", isActive ? "#i-stop" : "#i-play");
       }
       btn.querySelector(".cat-min").textContent = formatMinutes(liveTotalOf(id));
     });
 
-    el.clock.classList.toggle("is-running", !!activeCat);
-    setTone(el.clock, activeCat ? activeCat.tone : null);
+    el.stopwatch.classList.toggle("is-running", !!activeCat);
+    setTone(el.stopwatch, activeCat ? activeCat.tone : null);
+    el.stop.hidden = !activeCat;
     if (activeCat) {
       el.statusText.textContent = activeCat.label;
       el.time.textContent = formatMinSec(activeElapsed());
-      el.hint.textContent = "Touche à nouveau le poste pour arrêter";
     } else {
-      el.statusText.textContent = "En attente";
+      el.statusText.textContent = "Aucun poste en cours";
       el.time.textContent = "00:00";
-      el.hint.textContent = "Touche une catégorie pour lancer le chrono";
     }
 
     el.grandTotal.textContent = `${minutedMinutes()} min`;
     renderCalcResults();
   }
 
-  // ---------- calculatrice de rendement ----------
+  el.stop.addEventListener("click", () => { stopActive(); render(); });
+
+  // ---------- calcul du rendement ----------
   // Temps de production = base (455 min) − minutes minutées.
   // Rendement = minutes produites (Σ quantité × cadence de chaque matière) ÷ temps de production.
   function computeCalc() {
@@ -445,16 +563,14 @@
       const minutes = minutesFor(qty, p);
       const out = row.querySelector(".prod-total");
       const missingRate = qty > 0 && minutes == null;
-      out.textContent = missingRate ? "Cadence manquante" : `= ${formatNumber(minutes || 0, 1)} min`;
+      out.textContent = missingRate ? "Cadence manquante" : `${formatNumber(minutes || 0, 1)} min`;
       out.classList.toggle("is-warn", missingRate);
-      row.classList.toggle("is-filled", qty > 0);
-      const hasRate = parseNum(p.refQty) > 0 && parseNum(p.refMin) > 0;
-      const toggle = row.querySelector(".prod-rate-toggle");
-      toggle.classList.toggle("is-missing", !hasRate);
-      const refQty = parseNum(p.refQty);
-      row.querySelector(".prod-rate-text").textContent = hasRate
-        ? `${formatNumber(refQty, 2)} ${refQty < 2 ? "pièce" : "pièces"} en ${formatNumber(parseNum(p.refMin), 2)} min`
-        : "Définir la cadence";
+      const label = rateLabel(p);
+      const rate = row.querySelector(".prod-rate");
+      rate.textContent = label || "Définir la cadence";
+      rate.classList.toggle("is-missing", !label);
+      row.querySelector(".prod-open").setAttribute("aria-label",
+        `${p.label}, cadence ${label || "non définie"}. Modifier la cadence`);
     });
   }
 
@@ -463,77 +579,74 @@
     el.calcProducts.innerHTML = "";
     state.calc.products.forEach((p, idx) => {
       const row = document.createElement("div");
-      row.className = "prod";
+      row.className = "row prod";
       row.dataset.prod = p.id;
       const uid = `p${idx}`;
-      // La cadence change rarement : affichée en texte, éditable à la demande. La quantité reste le champ principal.
       row.innerHTML = `
-        <div class="prod-main">
-          <div class="prod-head">
-            <h3 class="prod-name"></h3>
-            <button type="button" class="btn-icon danger prod-delete">${icon("trash")}</button>
-          </div>
-          <button type="button" class="prod-rate-toggle" aria-expanded="false" aria-controls="${uid}-editor">
-            <span class="visually-hidden">Cadence :</span>
-            <span class="prod-rate-text"></span>
-            ${icon("pencil-simple")}
-          </button>
-        </div>
-        <div class="prod-qty">
-          <label class="field-label" for="${uid}-qty">Quantité</label>
-          <input type="text" inputmode="numeric" id="${uid}-qty" class="field prod-qty-input" placeholder="0" autocomplete="off" />
-          <p class="prod-total" aria-live="polite">= 0 min</p>
-        </div>
-        <div class="prod-rate-editor" id="${uid}-editor" hidden>
-          <span class="field-label" id="${uid}-rate"></span>
-          <div class="prod-rate-inputs" role="group" aria-labelledby="${uid}-rate">
-            <input type="text" inputmode="numeric" class="field prod-rate-qty" placeholder="0" autocomplete="off" />
-            <span class="unit">pièces en</span>
-            <input type="text" inputmode="decimal" class="field prod-rate-min" placeholder="0" autocomplete="off" />
-            <span class="unit">min</span>
-            <button type="button" class="btn btn-secondary btn-inline prod-rate-done">Terminé</button>
-          </div>
-        </div>`;
+        <button type="button" class="prod-open" aria-haspopup="dialog">
+          <span class="prod-name"></span>
+          <span class="prod-rate"></span>
+        </button>
+        <span class="prod-qty">
+          <input type="text" inputmode="numeric" id="${uid}-qty" class="field prod-qty-input" placeholder="Qté" autocomplete="off" />
+          <span class="prod-total" aria-live="polite">0 min</span>
+        </span>`;
       row.querySelector(".prod-name").textContent = p.label;
-      row.querySelector(`#${uid}-rate`).textContent = `Cadence ${p.label}`;
-      const rateQty = row.querySelector(".prod-rate-qty");
-      const rateMin = row.querySelector(".prod-rate-min");
       const qty = row.querySelector(".prod-qty-input");
-      const toggle = row.querySelector(".prod-rate-toggle");
-      const editor = row.querySelector(".prod-rate-editor");
-      rateQty.setAttribute("aria-label", `Pièces de référence, ${p.label}`);
-      rateMin.setAttribute("aria-label", `Minutes de référence, ${p.label}`);
-      rateQty.value = p.refQty;
-      rateMin.value = p.refMin;
+      qty.setAttribute("aria-label", `Quantité ${p.label}`);
       qty.value = state.calc.qty[p.id] || "";
-      const setEditor = (open) => {
-        editor.hidden = !open;
-        toggle.setAttribute("aria-expanded", open ? "true" : "false");
-        (open ? rateQty : toggle).focus();
-      };
-      toggle.addEventListener("click", () => setEditor(editor.hidden));
-      row.querySelector(".prod-rate-done").addEventListener("click", () => setEditor(false));
-      bindNumeric(rateQty, digitsOnly, (v) => { p.refQty = v; persist(); renderCalcResults(); });
-      bindNumeric(rateMin, decimalOnly, (v) => { p.refMin = v; persist(); renderCalcResults(); });
       bindNumeric(qty, digitsOnly, (v) => { state.calc.qty[p.id] = v; persist(); renderCalcResults(); });
-      const del = row.querySelector(".prod-delete");
-      if (p.builtin) {
-        del.remove();
-      } else {
-        del.setAttribute("aria-label", `Supprimer ${p.label}`);
-        del.addEventListener("click", async () => {
-          const ok = await ask({ title: `Supprimer ${p.label} ?`, text: "Sa cadence et sa quantité du jour seront effacées.", confirmLabel: "Supprimer", danger: true });
-          if (!ok) return;
-          state.calc.products = state.calc.products.filter((x) => x.id !== p.id);
-          delete state.calc.qty[p.id];
-          persist();
-          renderCalcProducts();
-          renderCalcResults();
-        });
-      }
+      row.querySelector(".prod-open").addEventListener("click", () => openRateSheet(p));
       el.calcProducts.appendChild(row);
     });
   }
+
+  // ---------- feuille : cadence ----------
+  let rateTarget = null;
+
+  function updateRateHint() {
+    const q = parseNum(el.rateQty.value);
+    const m = parseNum(el.rateMin.value);
+    el.rateHint.textContent = q > 0 && m > 0
+      ? `Soit ${formatNumber(m / q, 3)} min par pièce, ou ${formatNumber((q / m) * 60, 1)} pièces par heure.`
+      : "Exemple : 470 pièces en 60 minutes.";
+  }
+
+  function openRateSheet(p) {
+    rateTarget = p;
+    el.rateTitle.textContent = p.label;
+    el.rateQty.value = p.refQty;
+    el.rateMin.value = p.refMin;
+    el.rateDeleteSection.hidden = !!p.builtin;
+    updateRateHint();
+    openDialog(el.dlgRate);
+    el.rateQty.focus();
+  }
+
+  bindNumeric(el.rateQty, digitsOnly, updateRateHint);
+  bindNumeric(el.rateMin, decimalOnly, updateRateHint);
+  el.rateCancel.addEventListener("click", () => closeDialog(el.dlgRate));
+  makeDismissible(el.dlgRate, () => closeDialog(el.dlgRate));
+  el.formRate.addEventListener("submit", (e) => {
+    e.preventDefault();
+    if (!rateTarget) return;
+    rateTarget.refQty = el.rateQty.value;
+    rateTarget.refMin = el.rateMin.value;
+    persist();
+    closeDialog(el.dlgRate);
+    renderCalcResults();
+  });
+  el.rateDelete.addEventListener("click", async () => {
+    const p = rateTarget;
+    closeDialog(el.dlgRate);
+    const ok = await ask({ title: `Supprimer ${p.label} ?`, text: "Sa cadence et sa quantité du jour seront effacées.", confirmLabel: "Supprimer la matière", danger: true });
+    if (!ok) return;
+    state.calc.products = state.calc.products.filter((x) => x.id !== p.id);
+    delete state.calc.qty[p.id];
+    persist();
+    renderCalcProducts();
+    renderCalcResults();
+  });
 
   // ---------- enregistrer / remettre à zéro ----------
   function resetTotals() {
@@ -542,15 +655,14 @@
     persist();
   }
 
-  el.saveDay.addEventListener("click", async () => {
+  el.saveDay.addEventListener("click", () => {
     const hasMinutes = minutedMinutes() > 0;
     if (!hasMinutes && computeCalc().produced === 0) { toast("Rien à enregistrer pour l'instant"); return; }
-    const ok = await ask({
-      title: "Enregistrer la journée ?",
-      text: "Les minutes minutées et la production sont archivées dans l'historique, puis les compteurs repartent à zéro.",
-      confirmLabel: "Enregistrer",
-    });
-    if (!ok) return;
+    const before = {
+      totals: { ...state.totals },
+      active: state.active ? { ...state.active } : null,
+      qty: { ...state.calc.qty },
+    };
     stopActive();
     const items = state.categories
       .map((c) => ({ label: c.label, tone: c.tone, ms: totalOf(c.id) }))
@@ -558,8 +670,9 @@
     const totalMs = items.reduce((acc, i) => acc + minutesOf(i.ms) * 60000, 0);
     const calc = computeCalc();
     const now = new Date();
+    const entryId = uuid();
     state.history.unshift({
-      id: uuid(),
+      id: entryId,
       savedAt: now.getTime(),
       dateLabel: now.toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long", year: "numeric" }),
       items,
@@ -572,7 +685,21 @@
     renderHistory();
     render();
     showView("view-history");
-    toast("Journée enregistrée");
+    toast("Journée enregistrée", {
+      label: "Annuler",
+      run: () => {
+        state.history = state.history.filter((e) => e.id !== entryId);
+        state.totals = before.totals;
+        state.active = before.active;
+        state.calc.qty = before.qty;
+        persist();
+        renderCalcProducts();
+        renderHistory();
+        render();
+        showView("view-calc");
+        toast("Enregistrement annulé");
+      },
+    });
   });
 
   el.finish.addEventListener("click", () => showView("view-calc"));
@@ -587,25 +714,27 @@
   el.calcAddProduct.addEventListener("click", async () => {
     const label = await ask({
       title: "Nouvelle matière",
+      text: "Tu pourras ensuite régler sa cadence.",
       confirmLabel: "Ajouter",
       input: {
         label: "Nom de la matière",
-        placeholder: "Ex. : Bobines",
+        placeholder: "Nom de la matière",
         emptyMessage: "Écris le nom de la matière.",
         validate: (v) => state.calc.products.some((p) => p.label.toLowerCase() === v.toLowerCase())
           ? "Cette matière existe déjà." : null,
       },
     });
     if (!label) return;
-    state.calc.products.push({ id: uuid(), label, refQty: "", refMin: "", builtin: false });
+    const p = { id: uuid(), label, refQty: "", refMin: "", builtin: false };
+    state.calc.products.push(p);
     persist();
     renderCalcProducts();
     renderCalcResults();
-    toast(`${label} ajoutée`);
+    openRateSheet(p);
   });
 
   el.calcClear.addEventListener("click", async () => {
-    const ok = await ask({ title: "Effacer les quantités ?", text: "Les cadences sont conservées.", confirmLabel: "Effacer", danger: true });
+    const ok = await ask({ title: "Effacer les quantités ?", text: "Les cadences sont conservées.", confirmLabel: "Effacer les quantités", danger: true });
     if (!ok) return;
     state.calc.qty = {};
     persist();
@@ -615,7 +744,7 @@
 
   el.reset.addEventListener("click", async () => {
     const ok = await ask({
-      title: "Remettre à zéro ?",
+      title: "Remettre les compteurs à zéro ?",
       text: "Les minutes minutées d'aujourd'hui seront effacées sans être enregistrées.",
       confirmLabel: "Remettre à zéro",
       danger: true,
@@ -627,103 +756,85 @@
   });
 
   // ---------- historique ----------
-  function dayRow(label, value, { tone = null, total = false } = {}) {
+  function historyRow(title, value, { subtitle = "", strong = false } = {}) {
     const row = document.createElement("div");
-    row.className = "day-row" + (total ? " is-total" : "");
-    const left = document.createElement("span");
-    left.className = "day-row-label";
-    if (tone !== null) {
-      const sw = document.createElement("span");
-      sw.className = "swatch";
-      sw.setAttribute("aria-hidden", "true");
-      if (tone) setTone(row, tone);
-      left.appendChild(sw);
+    row.className = "row";
+    const text = document.createElement("span");
+    text.className = "row-text";
+    const t = document.createElement("span");
+    t.className = "row-title" + (strong ? " row-strong" : "");
+    t.textContent = title;
+    text.appendChild(t);
+    if (subtitle) {
+      const s = document.createElement("span");
+      s.className = "row-subtitle";
+      s.textContent = subtitle;
+      text.appendChild(s);
     }
-    left.appendChild(document.createTextNode(label));
-    const right = document.createElement("span");
-    right.className = "day-row-value";
-    right.textContent = value;
-    row.appendChild(left);
-    row.appendChild(right);
+    const v = document.createElement("span");
+    v.className = strong ? "day-score" : "row-value";
+    v.textContent = value;
+    row.append(text, v);
     return row;
-  }
-
-  function dayGroup(title, rows) {
-    const g = document.createElement("div");
-    g.className = "day-group";
-    const h = document.createElement("h4");
-    h.className = "day-group-title";
-    h.textContent = title;
-    g.appendChild(h);
-    rows.forEach((r) => g.appendChild(r));
-    return g;
   }
 
   function renderHistory() {
     el.historyList.innerHTML = "";
     el.historyEmpty.hidden = state.history.length > 0;
     state.history.forEach((entry) => {
-      const card = document.createElement("article");
-      card.className = "panel day";
+      const section = document.createElement("section");
+      section.className = "group day";
+      const header = document.createElement("h2");
+      header.className = "group-header";
+      header.textContent = capitalize(entry.dateLabel);
+      const list = document.createElement("div");
+      list.className = "list";
 
-      const head = document.createElement("header");
-      head.className = "day-head";
-      const date = document.createElement("h3");
-      date.className = "day-date";
-      date.textContent = entry.dateLabel;
-      const score = document.createElement("p");
-      score.className = "day-score";
-      const scoreLabel = document.createElement("span");
-      scoreLabel.className = "day-score-label";
       if (entry.calc && entry.calc.rendement != null) {
-        scoreLabel.textContent = "Rendement";
-        score.append(scoreLabel, `${formatNumber(entry.calc.rendement, 1)} %`);
-      } else {
-        scoreLabel.textContent = "Minuté";
-        score.append(scoreLabel, formatMinutes(entry.totalMs));
+        list.appendChild(historyRow("Rendement", `${formatNumber(entry.calc.rendement, 1)} %`, { strong: true }));
       }
-      head.append(date, score);
-      card.appendChild(head);
-
-      const minutedRows = entry.items.map((i) => dayRow(i.label, formatMinutes(i.ms), { tone: toneOf(i) || "" }));
-      minutedRows.push(dayRow("Total", formatMinutes(entry.totalMs), { total: true }));
-      card.appendChild(dayGroup("Minutes minutées", minutedRows));
-
+      const minutedDetail = entry.items.map((i) => `${i.label} ${minutesOf(i.ms)}`).join(" · ");
+      list.appendChild(historyRow("Minutes minutées", formatMinutes(entry.totalMs), { subtitle: minutedDetail }));
       if (entry.calc) {
         const c = entry.calc;
-        const prodRows = (c.items || []).map((i) => {
-          const detail = i.refQty
-            ? `${formatNumber(i.qty, 2)} (${formatNumber(i.refQty, 2)} en ${formatNumber(i.refMin, 2)} min)`
-            : `${formatNumber(i.qty, 2)} × ${formatNumber(i.unit || 0, 3)}`;
-          return dayRow(`${i.label} · ${detail}`, `${formatNumber(i.minutes, 1)} min`);
-        });
-        prodRows.push(dayRow("Minutes produites", `${formatNumber(c.produced, 1)} min`, { total: true }));
-        prodRows.push(dayRow("Temps de production", `${formatNumber(c.base, 1)} − ${c.minuted} = ${formatNumber(c.net, 1)} min`));
-        card.appendChild(dayGroup("Production", prodRows));
+        const prodDetail = (c.items || []).map((i) => `${i.label} ${formatNumber(i.qty, 2)}`).join(" · ");
+        list.appendChild(historyRow("Minutes produites", `${formatNumber(c.produced, 1)} min`, { subtitle: prodDetail }));
+        list.appendChild(historyRow("Temps de production", `${formatNumber(c.net, 1)} min`,
+          { subtitle: `${formatNumber(c.base, 1)} − ${c.minuted} min minutées` }));
       }
-
-      const actions = document.createElement("div");
-      actions.className = "day-actions";
       const del = document.createElement("button");
       del.type = "button";
-      del.className = "btn btn-danger-quiet btn-inline";
-      del.innerHTML = `${icon("trash")}<span>Supprimer</span>`;
-      del.setAttribute("aria-label", `Supprimer la journée du ${entry.dateLabel}`);
+      del.className = "row row-destructive";
+      del.textContent = "Supprimer la journée";
       del.addEventListener("click", async () => {
-        const ok = await ask({ title: "Supprimer cette journée ?", text: entry.dateLabel, confirmLabel: "Supprimer", danger: true });
+        const ok = await ask({ title: "Supprimer cette journée ?", text: capitalize(entry.dateLabel), confirmLabel: "Supprimer la journée", danger: true });
         if (!ok) return;
         state.history = state.history.filter((e) => e.id !== entry.id);
         persist();
         renderHistory();
       });
-      actions.appendChild(del);
-      card.appendChild(actions);
+      list.appendChild(del);
 
-      el.historyList.appendChild(card);
+      section.append(header, list);
+      el.historyList.appendChild(section);
     });
   }
 
-  // ---------- onglets ----------
+  // ---------- onglets + barre de navigation compacte ----------
+  let titleObserver = null;
+
+  function watchLargeTitle(view) {
+    if (titleObserver) titleObserver.disconnect();
+    el.navbarTitle.textContent = view.dataset.title;
+    el.navbar.classList.remove("is-visible");
+    const h1 = view.querySelector(".large-title h1");
+    if (!h1 || !("IntersectionObserver" in window)) return;
+    titleObserver = new IntersectionObserver(([e]) => {
+      el.navbar.classList.toggle("is-visible", !e.isIntersecting);
+    }, { rootMargin: "-60px 0px 0px 0px" });
+    titleObserver.observe(h1);
+  }
+
   function showView(viewId) {
     document.querySelectorAll(".tab").forEach((b) => {
       if (b.dataset.view === viewId) b.setAttribute("aria-current", "page");
@@ -731,13 +842,14 @@
     });
     document.querySelectorAll(".view").forEach((v) => v.classList.toggle("active", v.id === viewId));
     window.scrollTo(0, 0);
+    watchLargeTitle($(viewId));
   }
 
   document.querySelectorAll(".tab").forEach((btn) => {
     btn.addEventListener("click", () => showView(btn.dataset.view));
   });
 
-  // ---------- gestion des catégories ----------
+  // ---------- feuille : postes ----------
   function nextTone() {
     const used = state.categories.map((c) => c.tone);
     return TONES.find((t) => !used.includes(t)) || TONES[state.categories.length % TONES.length];
@@ -748,24 +860,24 @@
     el.customCatSection.hidden = customs.length === 0;
     el.customCatList.innerHTML = "";
     customs.forEach((cat) => {
-      const li = document.createElement("li");
-      setTone(li, cat.tone);
-      const left = document.createElement("span");
-      left.className = "item-label";
-      left.innerHTML = `<span class="swatch" aria-hidden="true"></span>`;
-      left.appendChild(document.createTextNode(cat.label));
+      const row = document.createElement("div");
+      row.className = "row cat";
+      setTone(row, cat.tone);
+      row.innerHTML = `<span class="row-icon" aria-hidden="true">${icon("timer")}</span><span class="row-title"></span>`;
+      row.querySelector(".row-title").textContent = cat.label;
       const del = document.createElement("button");
       del.type = "button";
-      del.className = "btn-icon danger";
-      del.innerHTML = icon("trash");
+      del.className = "btn-inline-tint";
+      del.style.color = "var(--red)";
+      del.textContent = "Supprimer";
       del.setAttribute("aria-label", `Supprimer ${cat.label}`);
       del.addEventListener("click", async () => {
         const hasTime = totalOf(cat.id) > 0 || (state.active && state.active.id === cat.id);
-        el.dlgCats.close();
+        closeDialog(el.dlgCats);
         const ok = await ask({
           title: `Supprimer ${cat.label} ?`,
           text: hasTime ? "Le temps compté aujourd'hui sur ce poste sera perdu." : "",
-          confirmLabel: "Supprimer",
+          confirmLabel: "Supprimer le poste",
           danger: true,
         });
         if (ok) {
@@ -776,27 +888,23 @@
           renderCats();
           render();
         }
-        openCatsDialog();
+        openCatsSheet();
       });
-      li.appendChild(left);
-      li.appendChild(del);
-      el.customCatList.appendChild(li);
+      row.appendChild(del);
+      el.customCatList.appendChild(row);
     });
   }
 
-  function openCatsDialog() {
+  function openCatsSheet() {
     el.newCatInput.value = "";
     showFieldError(el.newCatInput, el.newCatError, "");
     renderCustomCats();
-    if (hasDialog) el.dlgCats.showModal(); else el.dlgCats.setAttribute("open", "");
+    openDialog(el.dlgCats);
   }
 
-  function closeCatsDialog() {
-    if (hasDialog) el.dlgCats.close(); else el.dlgCats.removeAttribute("open");
-  }
-
-  el.manageCats.addEventListener("click", openCatsDialog);
-  el.dlgCatsClose.addEventListener("click", closeCatsDialog);
+  el.manageCats.addEventListener("click", openCatsSheet);
+  el.dlgCatsClose.addEventListener("click", () => closeDialog(el.dlgCats));
+  makeDismissible(el.dlgCats, () => closeDialog(el.dlgCats));
   el.newCatInput.addEventListener("input", () => showFieldError(el.newCatInput, el.newCatError, ""));
 
   el.formAddCat.addEventListener("submit", (e) => {
@@ -816,7 +924,7 @@
   });
 
   // ---------- chrono en direct ----------
-  setInterval(() => { if (state.active) render(); }, 500);
+  setInterval(() => { if (state.active) render(); }, 250);
 
   // ---------- init ----------
   persist();

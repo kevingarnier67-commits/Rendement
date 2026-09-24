@@ -24,14 +24,14 @@ Tout est stocké en local sur le téléphone (aucune donnée envoyée sur intern
 
 ## Design
 
-Refonte réalisée avec le skill `ui-ux-pro-max` (`.claude/skills/ui-ux-pro-max`) :
+Apparence d'une app iOS native (iOS 26/27, Liquid Glass), puis audit avec le skill `apple-design` (`.claude/skills/apple-design`) :
 
-- **Style** : minimalisme suisse (recommandé pour les outils professionnels) : grille, contraste fort, pas d'effet décoratif.
-- **Couleurs** : palette « ardoise industrielle » en variables CSS, thème clair par défaut (lisible sous l'éclairage de l'atelier) et thème sombre automatique selon le réglage de l'iPhone. Toutes les paires texte/fond ≥ 4,5:1, bordures de champs ≥ 3:1.
-- **Voyants andon** : chaque poste a un ton (bleu, violet, orange…) ; le poste en cours devient un bloc plein de sa couleur.
+- **Structure iOS** : grands titres, listes groupées à coins arrondis, chrono façon app Horloge, barre d'onglets flottante en verre, feuilles avec poignée (glisser vers le bas pour fermer), boutons ronds × / ✓, menus d'action pour les suppressions.
+- **Liquid Glass** uniquement sur la couche de commandes (barre d'onglets, feuilles, alertes, messages), jamais sur le contenu. Effet de bord de défilement en haut et en bas à la place d'une barre opaque.
+- **Couleurs système iOS** (fonds groupés, gris, teintes des postes) en clair et en sombre automatique. Bleu, rouge et gris secondaire en variantes lisibles : tout le texte ≥ 4,5:1.
+- **Enregistrer la journée** ne demande plus de confirmation : un message « Journée enregistrée · Annuler » permet de revenir en arrière.
+- **Accessibilité** : taille de texte de l'iPhone (les valeurs passent à la ligne aux très grandes tailles, sans couper les mots), cibles ≥ 44 pt, VoiceOver, Réduire la transparence (barres opaques), Augmenter le contraste, Réduire les animations.
 - **Icônes** : [Phosphor](https://github.com/phosphor-icons/core) (MIT), intégrées en SVG dans `index.html`, sans dépendance.
-- **Police** : police système de l'iPhone (pas de police web : hors-ligne et suit la taille de texte réglée).
-- **Accessibilité** : cibles tactiles ≥ 44 pt, taille de texte d'iOS, Réduire les animations, Augmenter le contraste, VoiceOver.
 
 ## Installer sur iPhone
 
