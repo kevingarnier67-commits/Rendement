@@ -15,7 +15,7 @@ Appuie sur une catégorie pour démarrer le chrono, appuie à nouveau pour l'arr
 L'onglet **Calcul** part de la base de 455 min (modifiable) :
 
 - **Temps de production** = 455 − minutes aux postes minutés (repris automatiquement du minuteur)
-- **Minutes produites** = somme des lignes quantité × minutes par pièce
+- **Minutes produites** = somme, pour chaque matière (Pôles, Pôles 80/100A, S1, Liaisons, Cages, MFV, + matières ajoutées), de la quantité × minutes par pièce. Le temps par pièce est mémorisé ; seules les quantités sont à saisir chaque jour.
 - **Rendement** = minutes produites ÷ temps de production
 
 « Enregistrer la journée » archive les minutes par catégorie et le rendement dans l'onglet **Historique**, puis remet les compteurs à zéro.

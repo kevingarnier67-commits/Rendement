@@ -19,8 +19,38 @@
 
   const DEFAULT_BASE = 455;
 
-  function freshCalcLines() {
-    return [{ id: uuid(), qty: "", unit: "" }];
+  const DEFAULT_PRODUCTS = [
+    { id: "poles", label: "Pôles" },
+    { id: "poles80", label: "Pôles 80/100A" },
+    { id: "s1", label: "S1" },
+    { id: "liaisons", label: "Liaisons" },
+    { id: "cages", label: "Cages" },
+    { id: "mfv", label: "MFV" },
+  ];
+
+  // Le temps par pièce (unit) est mémorisé d'un jour à l'autre ; seules les quantités (qty) sont remises à zéro.
+  function freshCalc() {
+    return {
+      base: DEFAULT_BASE,
+      products: DEFAULT_PRODUCTS.map((p) => ({ ...p, unit: "", builtin: true })),
+      qty: {},
+    };
+  }
+
+  function normalizeCalc(calc) {
+    if (!calc) return freshCalc();
+    if (Array.isArray(calc.products)) return calc;
+    // migration depuis la version à lignes libres (quantité × min/pièce sans nom de matière)
+    const next = freshCalc();
+    if (calc.base != null && calc.base !== "") next.base = calc.base;
+    (calc.lines || [])
+      .filter((l) => parseNum(l.qty) > 0 || parseNum(l.unit) > 0)
+      .forEach((l, i) => {
+        const id = uuid();
+        next.products.push({ id, label: `Référence ${i + 1}`, unit: l.unit, builtin: false });
+        next.qty[id] = l.qty;
+      });
+    return next;
   }
 
   function freshState() {
@@ -29,7 +59,7 @@
       totals: {},
       active: null,
       history: [],
-      calc: { base: DEFAULT_BASE, lines: freshCalcLines() },
+      calc: freshCalc(),
     };
   }
 
@@ -39,7 +69,7 @@
       if (raw) {
         const s = JSON.parse(raw);
         if (s && Array.isArray(s.categories)) {
-          if (!s.calc) s.calc = { base: DEFAULT_BASE, lines: freshCalcLines() };
+          s.calc = normalizeCalc(s.calc);
           return s;
         }
       }
@@ -101,8 +131,8 @@
     calcBase: $("calc-base"),
     calcMinuted: $("calc-minuted"),
     calcNet: $("calc-net"),
-    calcLines: $("calc-lines"),
-    calcAddLine: $("btn-add-line"),
+    calcProducts: $("calc-products"),
+    calcAddProduct: $("btn-add-product"),
     calcProduced: $("calc-produced"),
     calcRendement: $("calc-rendement"),
     calcClear: $("btn-calc-clear"),
@@ -224,14 +254,21 @@
 
   // ---------- calculatrice de rendement ----------
   // Temps de production = base (455 min) − minutes passées aux postes minutés.
-  // Rendement = minutes produites (Σ quantité × temps/pièce) ÷ temps de production.
+  // Rendement = minutes produites (Σ quantité × temps/pièce par matière) ÷ temps de production.
   function computeCalc() {
     const base = parseNum(state.calc.base);
     const minuted = minutedMinutes();
     const net = base - minuted;
-    const produced = state.calc.lines.reduce((acc, l) => acc + parseNum(l.qty) * parseNum(l.unit), 0);
+    const items = state.calc.products
+      .map((p) => {
+        const qty = parseNum(state.calc.qty[p.id]);
+        const unit = parseNum(p.unit);
+        return { label: p.label, qty, unit, minutes: qty * unit };
+      })
+      .filter((i) => i.qty > 0);
+    const produced = items.reduce((acc, i) => acc + i.minutes, 0);
     const rendement = net > 0 && produced > 0 ? (produced / net) * 100 : null;
-    return { base, minuted, net, produced, rendement };
+    return { base, minuted, net, produced, rendement, items };
   }
 
   function rendementClass(pct) {
@@ -248,47 +285,62 @@
     el.calcProduced.textContent = `${formatNumber(c.produced, 1)} min`;
     el.calcRendement.textContent = c.rendement == null ? "--" : `${formatNumber(c.rendement, 1)} %`;
     el.calcRendement.className = "calc-result-value " + rendementClass(c.rendement);
-    state.calc.lines.forEach((line) => {
-      const out = el.calcLines.querySelector(`[data-line="${line.id}"] .calc-line-total`);
-      if (out) out.textContent = `= ${formatNumber(parseNum(line.qty) * parseNum(line.unit), 1)} min`;
+    state.calc.products.forEach((p) => {
+      const row = el.calcProducts.querySelector(`[data-prod="${p.id}"]`);
+      if (!row) return;
+      const qty = parseNum(state.calc.qty[p.id]);
+      const unit = parseNum(p.unit);
+      const out = row.querySelector(".prod-total");
+      const missingUnit = qty > 0 && unit <= 0;
+      out.textContent = missingUnit ? "temps/pièce ?" : `= ${formatNumber(qty * unit, 1)} min`;
+      out.classList.toggle("warn", missingUnit);
+      row.classList.toggle("filled", qty > 0);
     });
   }
 
-  function renderCalcLines() {
+  function renderCalcProducts() {
     el.calcBase.value = state.calc.base;
-    el.calcLines.innerHTML = "";
-    state.calc.lines.forEach((line, idx) => {
+    el.calcProducts.innerHTML = "";
+    state.calc.products.forEach((p) => {
       const row = document.createElement("div");
-      row.className = "calc-line";
-      row.dataset.line = line.id;
+      row.className = "prod";
+      row.dataset.prod = p.id;
       row.innerHTML = `
-        <label class="calc-field">
-          <span>Quantité</span>
-          <input type="text" inputmode="decimal" class="calc-qty" placeholder="0" />
-        </label>
-        <span class="calc-times">×</span>
-        <label class="calc-field">
-          <span>Min / pièce</span>
-          <input type="text" inputmode="decimal" class="calc-unit" placeholder="0,00" />
-        </label>
-        <button type="button" class="calc-line-delete" aria-label="Supprimer la ligne">✕</button>
-        <span class="calc-line-total">= 0 min</span>`;
-      const qty = row.querySelector(".calc-qty");
-      const unit = row.querySelector(".calc-unit");
-      qty.value = line.qty;
-      unit.value = line.unit;
-      qty.addEventListener("input", () => { line.qty = qty.value; persist(); renderCalcResults(); });
-      unit.addEventListener("input", () => { line.unit = unit.value; persist(); renderCalcResults(); });
-      const del = row.querySelector(".calc-line-delete");
-      if (state.calc.lines.length === 1 && idx === 0) del.classList.add("invisible");
-      del.addEventListener("click", () => {
-        state.calc.lines = state.calc.lines.filter((l) => l.id !== line.id);
-        if (!state.calc.lines.length) state.calc.lines = freshCalcLines();
-        persist();
-        renderCalcLines();
-        renderCalcResults();
-      });
-      el.calcLines.appendChild(row);
+        <div class="prod-info">
+          <div class="prod-name-row">
+            <span class="prod-name"></span>
+            <button type="button" class="prod-delete" aria-label="Supprimer la matière">✕</button>
+          </div>
+          <label class="prod-unit">
+            <input type="text" inputmode="decimal" class="prod-unit-input" placeholder="0,00" />
+            <span>min / pièce</span>
+          </label>
+        </div>
+        <div class="prod-qty">
+          <input type="text" inputmode="numeric" class="prod-qty-input" placeholder="Qté" />
+          <span class="prod-total">= 0 min</span>
+        </div>`;
+      row.querySelector(".prod-name").textContent = p.label;
+      const unit = row.querySelector(".prod-unit-input");
+      const qty = row.querySelector(".prod-qty-input");
+      unit.value = p.unit;
+      qty.value = state.calc.qty[p.id] || "";
+      unit.addEventListener("input", () => { p.unit = unit.value; persist(); renderCalcResults(); });
+      qty.addEventListener("input", () => { state.calc.qty[p.id] = qty.value; persist(); renderCalcResults(); });
+      const del = row.querySelector(".prod-delete");
+      if (p.builtin) {
+        del.remove();
+      } else {
+        del.addEventListener("click", () => {
+          if (!confirm(`Supprimer « ${p.label} » ?`)) return;
+          state.calc.products = state.calc.products.filter((x) => x.id !== p.id);
+          delete state.calc.qty[p.id];
+          persist();
+          renderCalcProducts();
+          renderCalcResults();
+        });
+      }
+      el.calcProducts.appendChild(row);
     });
   }
 
@@ -317,9 +369,9 @@
       totalMs,
       calc: calc.produced > 0 ? calc : null,
     });
-    state.calc.lines = freshCalcLines();
+    state.calc.qty = {};
     resetTotals();
-    renderCalcLines();
+    renderCalcProducts();
     renderHistory();
     render();
     toast("Journée enregistrée ✓");
@@ -331,20 +383,25 @@
     renderCalcResults();
   });
 
-  el.calcAddLine.addEventListener("click", () => {
-    state.calc.lines.push({ id: uuid(), qty: "", unit: "" });
+  el.calcAddProduct.addEventListener("click", () => {
+    const label = (prompt("Nom de la matière :") || "").trim();
+    if (!label) return;
+    if (state.calc.products.some((p) => p.label.toLowerCase() === label.toLowerCase())) {
+      toast("Cette matière existe déjà");
+      return;
+    }
+    state.calc.products.push({ id: uuid(), label, unit: "", builtin: false });
     persist();
-    renderCalcLines();
+    renderCalcProducts();
     renderCalcResults();
-    const inputs = el.calcLines.querySelectorAll(".calc-qty");
-    inputs[inputs.length - 1].focus();
+    toast(`« ${label} » ajoutée ✓`);
   });
 
   el.calcClear.addEventListener("click", () => {
-    if (!confirm("Effacer toutes les lignes de production ?")) return;
-    state.calc.lines = freshCalcLines();
+    if (!confirm("Effacer les quantités ? (les temps par pièce sont conservés)")) return;
+    state.calc.qty = {};
     persist();
-    renderCalcLines();
+    renderCalcProducts();
     renderCalcResults();
   });
 
@@ -403,8 +460,11 @@
       const summary = [["Total minuté", formatMinutes(entry.totalMs)]];
       if (entry.calc) {
         const c = entry.calc;
+        summary.push(["Temps de production", `${formatNumber(c.base, 1)} − ${c.minuted} = ${formatNumber(c.net, 1)} min`]);
+        (c.items || []).forEach((i) => {
+          summary.push([`${i.label} : ${formatNumber(i.qty, 2)} × ${formatNumber(i.unit, 3)}`, `${formatNumber(i.minutes, 1)} min`]);
+        });
         summary.push(
-          ["Temps de production", `${formatNumber(c.base, 1)} − ${c.minuted} = ${formatNumber(c.net, 1)} min`],
           ["Minutes produites", `${formatNumber(c.produced, 1)} min`],
           ["Rendement", c.rendement == null ? "--" : `${formatNumber(c.rendement, 1)} %`],
         );
@@ -522,7 +582,7 @@
 
   // ---------- init ----------
   renderCats();
-  renderCalcLines();
+  renderCalcProducts();
   render();
   renderHistory();
 
