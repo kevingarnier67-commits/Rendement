@@ -19,38 +19,67 @@
 
   const DEFAULT_BASE = 455;
 
+  // Cadence de référence : refQty pièces en refMin minutes. Stockée telle quelle (pas de temps/pièce arrondi)
+  // pour que 470 Cages donnent exactement 60 min.
   const DEFAULT_PRODUCTS = [
-    { id: "poles", label: "Pôles" },
-    { id: "poles80", label: "Pôles 80/100A" },
-    { id: "s1", label: "S1" },
-    { id: "liaisons", label: "Liaisons" },
-    { id: "cages", label: "Cages" },
-    { id: "mfv", label: "MFV" },
+    { id: "poles", label: "Pôles", refQty: "", refMin: "" },
+    { id: "poles80", label: "Pôles 80/100A", refQty: "", refMin: "" },
+    { id: "s1", label: "S1", refQty: "96", refMin: "35" },
+    { id: "liaisons", label: "Liaisons", refQty: "144", refMin: "40" },
+    { id: "cages", label: "Cages", refQty: "470", refMin: "60" },
+    { id: "mfv", label: "MFV", refQty: "", refMin: "" },
   ];
+  const RATES_VERSION = 1;
 
-  // Le temps par pièce (unit) est mémorisé d'un jour à l'autre ; seules les quantités (qty) sont remises à zéro.
+  // Les cadences sont mémorisées d'un jour à l'autre ; seules les quantités (qty) sont remises à zéro.
   function freshCalc() {
     return {
       base: DEFAULT_BASE,
-      products: DEFAULT_PRODUCTS.map((p) => ({ ...p, unit: "", builtin: true })),
+      products: DEFAULT_PRODUCTS.map((p) => ({ ...p, builtin: true })),
       qty: {},
+      ratesVersion: RATES_VERSION,
     };
+  }
+
+  function unitToRate(unit) {
+    return parseNum(unit) > 0 ? { refQty: "1", refMin: unit } : { refQty: "", refMin: "" };
   }
 
   function normalizeCalc(calc) {
     if (!calc) return freshCalc();
-    if (Array.isArray(calc.products)) return calc;
-    // migration depuis la version à lignes libres (quantité × min/pièce sans nom de matière)
-    const next = freshCalc();
-    if (calc.base != null && calc.base !== "") next.base = calc.base;
-    (calc.lines || [])
-      .filter((l) => parseNum(l.qty) > 0 || parseNum(l.unit) > 0)
-      .forEach((l, i) => {
-        const id = uuid();
-        next.products.push({ id, label: `Référence ${i + 1}`, unit: l.unit, builtin: false });
-        next.qty[id] = l.qty;
+    let next;
+    if (Array.isArray(calc.products)) {
+      next = calc;
+      next.products.forEach((p) => {
+        if (p.refQty === undefined) Object.assign(p, unitToRate(p.unit));
+        delete p.unit;
       });
+    } else {
+      // migration depuis la version à lignes libres (quantité × min/pièce sans nom de matière)
+      next = freshCalc();
+      if (calc.base != null && calc.base !== "") next.base = calc.base;
+      (calc.lines || [])
+        .filter((l) => parseNum(l.qty) > 0 || parseNum(l.unit) > 0)
+        .forEach((l, i) => {
+          const id = uuid();
+          next.products.push({ id, label: `Référence ${i + 1}`, ...unitToRate(l.unit), builtin: false });
+          next.qty[id] = l.qty;
+        });
+    }
+    if ((next.ratesVersion || 0) < RATES_VERSION) {
+      DEFAULT_PRODUCTS.filter((d) => d.refQty).forEach((d) => {
+        const p = next.products.find((x) => x.id === d.id);
+        if (p) { p.refQty = d.refQty; p.refMin = d.refMin; }
+      });
+      next.ratesVersion = RATES_VERSION;
+    }
     return next;
+  }
+
+  function minutesFor(qty, p) {
+    const refQty = parseNum(p.refQty);
+    const refMin = parseNum(p.refMin);
+    return refQty > 0 && refMin > 0 ? (qty * refMin) / refQty : null;
   }
 
   function freshState() {
@@ -254,7 +283,7 @@
 
   // ---------- calculatrice de rendement ----------
   // Temps de production = base (455 min) − minutes passées aux postes minutés.
-  // Rendement = minutes produites (Σ quantité × temps/pièce par matière) ÷ temps de production.
+  // Rendement = minutes produites (Σ quantité × cadence de chaque matière) ÷ temps de production.
   function computeCalc() {
     const base = parseNum(state.calc.base);
     const minuted = minutedMinutes();
@@ -262,8 +291,13 @@
     const items = state.calc.products
       .map((p) => {
         const qty = parseNum(state.calc.qty[p.id]);
-        const unit = parseNum(p.unit);
-        return { label: p.label, qty, unit, minutes: qty * unit };
+        return {
+          label: p.label,
+          qty,
+          refQty: parseNum(p.refQty),
+          refMin: parseNum(p.refMin),
+          minutes: minutesFor(qty, p) || 0,
+        };
       })
       .filter((i) => i.qty > 0);
     const produced = items.reduce((acc, i) => acc + i.minutes, 0);
@@ -289,11 +323,11 @@
       const row = el.calcProducts.querySelector(`[data-prod="${p.id}"]`);
       if (!row) return;
       const qty = parseNum(state.calc.qty[p.id]);
-      const unit = parseNum(p.unit);
+      const minutes = minutesFor(qty, p);
       const out = row.querySelector(".prod-total");
-      const missingUnit = qty > 0 && unit <= 0;
-      out.textContent = missingUnit ? "temps/pièce ?" : `= ${formatNumber(qty * unit, 1)} min`;
-      out.classList.toggle("warn", missingUnit);
+      const missingRate = qty > 0 && minutes == null;
+      out.textContent = missingRate ? "cadence ?" : `= ${formatNumber(minutes || 0, 1)} min`;
+      out.classList.toggle("warn", missingRate);
       row.classList.toggle("filled", qty > 0);
     });
   }
@@ -311,21 +345,26 @@
             <span class="prod-name"></span>
             <button type="button" class="prod-delete" aria-label="Supprimer la matière">✕</button>
           </div>
-          <label class="prod-unit">
-            <input type="text" inputmode="decimal" class="prod-unit-input" placeholder="0,00" />
-            <span>min / pièce</span>
-          </label>
+          <div class="prod-rate">
+            <input type="text" inputmode="numeric" class="prod-rate-qty" placeholder="0" aria-label="Pièces de référence" />
+            <span>pièces en</span>
+            <input type="text" inputmode="decimal" class="prod-rate-min" placeholder="0" aria-label="Minutes de référence" />
+            <span>min</span>
+          </div>
         </div>
         <div class="prod-qty">
           <input type="text" inputmode="numeric" class="prod-qty-input" placeholder="Qté" />
           <span class="prod-total">= 0 min</span>
         </div>`;
       row.querySelector(".prod-name").textContent = p.label;
-      const unit = row.querySelector(".prod-unit-input");
+      const rateQty = row.querySelector(".prod-rate-qty");
+      const rateMin = row.querySelector(".prod-rate-min");
       const qty = row.querySelector(".prod-qty-input");
-      unit.value = p.unit;
+      rateQty.value = p.refQty;
+      rateMin.value = p.refMin;
       qty.value = state.calc.qty[p.id] || "";
-      unit.addEventListener("input", () => { p.unit = unit.value; persist(); renderCalcResults(); });
+      rateQty.addEventListener("input", () => { p.refQty = rateQty.value; persist(); renderCalcResults(); });
+      rateMin.addEventListener("input", () => { p.refMin = rateMin.value; persist(); renderCalcResults(); });
       qty.addEventListener("input", () => { state.calc.qty[p.id] = qty.value; persist(); renderCalcResults(); });
       const del = row.querySelector(".prod-delete");
       if (p.builtin) {
@@ -390,7 +429,7 @@
       toast("Cette matière existe déjà");
       return;
     }
-    state.calc.products.push({ id: uuid(), label, unit: "", builtin: false });
+    state.calc.products.push({ id: uuid(), label, refQty: "", refMin: "", builtin: false });
     persist();
     renderCalcProducts();
     renderCalcResults();
@@ -462,7 +501,10 @@
         const c = entry.calc;
         summary.push(["Temps de production", `${formatNumber(c.base, 1)} − ${c.minuted} = ${formatNumber(c.net, 1)} min`]);
         (c.items || []).forEach((i) => {
-          summary.push([`${i.label} : ${formatNumber(i.qty, 2)} × ${formatNumber(i.unit, 3)}`, `${formatNumber(i.minutes, 1)} min`]);
+          const detail = i.refQty
+            ? `${formatNumber(i.qty, 2)} (${formatNumber(i.refQty, 2)} en ${formatNumber(i.refMin, 2)} min)`
+            : `${formatNumber(i.qty, 2)} × ${formatNumber(i.unit || 0, 3)}`;
+          summary.push([`${i.label} : ${detail}`, `${formatNumber(i.minutes, 1)} min`]);
         });
         summary.push(
           ["Minutes produites", `${formatNumber(c.produced, 1)} min`],
