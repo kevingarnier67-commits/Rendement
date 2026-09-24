@@ -7,7 +7,8 @@
 
 <!-- PWA / iOS home screen -->
 <link rel="manifest" href="manifest.json" />
-<meta name="theme-color" content="#0a0e14" />
+<meta name="color-scheme" content="light dark" />
+<meta name="theme-color" content="#0F172A" />
 <meta name="apple-mobile-web-app-capable" content="yes" />
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
 <meta name="apple-mobile-web-app-title" content="Rendement" />
@@ -18,143 +19,203 @@
 </head>
 <body>
 
-<div class="app">
+<svg xmlns="http://www.w3.org/2000/svg" style="position:absolute;width:0;height:0;overflow:hidden" aria-hidden="true" focusable="false">
+  <!-- Icônes Phosphor (MIT, github.com/phosphor-icons/core v2.1.1) -->
+  <symbol id="i-timer" viewBox="0 0 256 256"><path d="M128,40a96,96,0,1,0,96,96A96.11,96.11,0,0,0,128,40Zm45.66,61.66-40,40a8,8,0,0,1-11.32-11.32l40-40a8,8,0,0,1,11.32,11.32ZM96,16a8,8,0,0,1,8-8h48a8,8,0,0,1,0,16H104A8,8,0,0,1,96,16Z"/></symbol>
+  <symbol id="i-calculator" viewBox="0 0 256 256"><path d="M200,24H56A16,16,0,0,0,40,40V216a16,16,0,0,0,16,16H200a16,16,0,0,0,16-16V40A16,16,0,0,0,200,24ZM88,200a12,12,0,1,1,12-12A12,12,0,0,1,88,200Zm0-40a12,12,0,1,1,12-12A12,12,0,0,1,88,160Zm40,40a12,12,0,1,1,12-12A12,12,0,0,1,128,200Zm0-40a12,12,0,1,1,12-12A12,12,0,0,1,128,160Zm40,40a12,12,0,1,1,12-12A12,12,0,0,1,168,200Zm0-40a12,12,0,1,1,12-12A12,12,0,0,1,168,160Zm16-56a8,8,0,0,1-8,8H80a8,8,0,0,1-8-8V64a8,8,0,0,1,8-8h96a8,8,0,0,1,8,8Z"/></symbol>
+  <symbol id="i-clock-counter-clockwise" viewBox="0 0 256 256"><path d="M224,128A96,96,0,0,1,62.11,197.82a8,8,0,1,1,11-11.64A80,80,0,1,0,71.43,71.43C67.9,75,64.58,78.51,61.35,82L77.66,98.34A8,8,0,0,1,72,112H32a8,8,0,0,1-8-8V64a8,8,0,0,1,13.66-5.66L50,70.7c3.22-3.49,6.54-7,10.06-10.55A96,96,0,0,1,224,128ZM128,72a8,8,0,0,0-8,8v48a8,8,0,0,0,3.88,6.86l40,24a8,8,0,1,0,8.24-13.72L136,123.47V80A8,8,0,0,0,128,72Z"/></symbol>
+  <symbol id="i-play" viewBox="0 0 256 256"><path d="M240,128a15.74,15.74,0,0,1-7.6,13.51L88.32,229.65a16,16,0,0,1-16.2.3A15.86,15.86,0,0,1,64,216.13V39.87a15.86,15.86,0,0,1,8.12-13.82,16,16,0,0,1,16.2.3L232.4,114.49A15.74,15.74,0,0,1,240,128Z"/></symbol>
+  <symbol id="i-stop" viewBox="0 0 256 256"><path d="M216,56V200a16,16,0,0,1-16,16H56a16,16,0,0,1-16-16V56A16,16,0,0,1,56,40H200A16,16,0,0,1,216,56Z"/></symbol>
+  <symbol id="i-plus" viewBox="0 0 256 256"><path d="M228,128a12,12,0,0,1-12,12H140v76a12,12,0,0,1-24,0V140H40a12,12,0,0,1,0-24h76V40a12,12,0,0,1,24,0v76h76A12,12,0,0,1,228,128Z"/></symbol>
+  <symbol id="i-x" viewBox="0 0 256 256"><path d="M208.49,191.51a12,12,0,0,1-17,17L128,145,64.49,208.49a12,12,0,0,1-17-17L111,128,47.51,64.49a12,12,0,0,1,17-17L128,111l63.51-63.52a12,12,0,0,1,17,17L145,128Z"/></symbol>
+  <symbol id="i-check" viewBox="0 0 256 256"><path d="M232.49,80.49l-128,128a12,12,0,0,1-17,0l-56-56a12,12,0,1,1,17-17L96,183,215.51,63.51a12,12,0,0,1,17,17Z"/></symbol>
+  <symbol id="i-arrow-right" viewBox="0 0 256 256"><path d="M224.49,136.49l-72,72a12,12,0,0,1-17-17L187,140H40a12,12,0,0,1,0-24H187L135.51,64.48a12,12,0,0,1,17-17l72,72A12,12,0,0,1,224.49,136.49Z"/></symbol>
+  <symbol id="i-trash" viewBox="0 0 256 256"><path d="M216,48H180V36A28,28,0,0,0,152,8H104A28,28,0,0,0,76,36V48H40a12,12,0,0,0,0,24h4V208a20,20,0,0,0,20,20H192a20,20,0,0,0,20-20V72h4a12,12,0,0,0,0-24ZM100,36a4,4,0,0,1,4-4h48a4,4,0,0,1,4,4V48H100Zm88,168H68V72H188ZM116,104v64a12,12,0,0,1-24,0V104a12,12,0,0,1,24,0Zm48,0v64a12,12,0,0,1-24,0V104a12,12,0,0,1,24,0Z"/></symbol>
+  <symbol id="i-pencil-simple" viewBox="0 0 256 256"><path d="M230.14,70.54,185.46,25.85a20,20,0,0,0-28.29,0L33.86,149.17A19.85,19.85,0,0,0,28,163.31V208a20,20,0,0,0,20,20H92.69a19.86,19.86,0,0,0,14.14-5.86L230.14,98.82a20,20,0,0,0,0-28.28ZM91,204H52V165l84-84,39,39ZM192,103,153,64l18.34-18.34,39,39Z"/></symbol>
+  <symbol id="i-export" viewBox="0 0 256 256"><path d="M220,112v96a20,20,0,0,1-20,20H56a20,20,0,0,1-20-20V112A20,20,0,0,1,56,92H76a12,12,0,0,1,0,24H60v88H196V116H180a12,12,0,0,1,0-24h20A20,20,0,0,1,220,112ZM96.49,72.49,116,53v83a12,12,0,0,0,24,0V53l19.51,19.52a12,12,0,1,0,17-17l-40-40a12,12,0,0,0-17,0l-40,40a12,12,0,1,0,17,17Z"/></symbol>
+</svg>
 
-  <header class="topbar">
-    <span class="brand">Rendement</span>
-    <span id="today-date" class="date"></span>
-  </header>
-
-  <!-- ===================== VUE MINUTEUR ===================== -->
-  <main id="view-timer" class="view active">
-
-    <section class="hero">
-      <div id="hero-status" class="hero-status idle">
-        <span class="dot"></span>
-        <span id="hero-status-text">En attente</span>
-      </div>
-      <div id="hero-timer" class="hero-timer">00:00</div>
-      <div id="hero-hint" class="hero-hint">Appuie sur une catégorie pour démarrer</div>
-    </section>
-
-    <section id="cat-list" class="cats"></section>
-
-    <button type="button" id="btn-manage-cats" class="btn-add-cat">+ Ajouter une catégorie</button>
-
-    <footer class="footer">
-      <div class="grand-total">
-        <span class="grand-total-label">Total non-productif</span>
-        <span id="grand-total" class="grand-total-value">0 min</span>
-      </div>
-      <button type="button" id="btn-finish" class="btn-finish">Terminer la journée →</button>
-      <button type="button" id="btn-reset" class="btn-reset">Remettre à zéro sans enregistrer</button>
-    </footer>
-
-  </main>
-
-  <!-- ===================== VUE CALCUL ===================== -->
-  <main id="view-calc" class="view">
-
-    <section class="calc-card">
-      <h3>Temps de production</h3>
-      <div class="calc-row">
-        <span>Base</span>
-        <span class="calc-base-wrap"><input type="text" inputmode="decimal" id="calc-base" class="calc-base" /> min</span>
-      </div>
-      <div class="calc-row">
-        <span>− Minutes aux postes minutés</span>
-        <span id="calc-minuted" class="calc-value">0 min</span>
-      </div>
-      <div class="calc-row calc-row-total">
-        <span>= Temps de production</span>
-        <span id="calc-net" class="calc-value">455 min</span>
-      </div>
-    </section>
-
-    <section class="calc-card">
-      <div class="calc-card-head">
-        <h3>Production</h3>
-        <button type="button" id="btn-calc-clear" class="calc-clear">Effacer</button>
-      </div>
-      <div id="calc-products" class="calc-products"></div>
-      <button type="button" id="btn-add-product" class="btn-add-cat">+ Ajouter une matière</button>
-      <div class="calc-row calc-row-total">
-        <span>Minutes produites</span>
-        <span id="calc-produced" class="calc-value">0 min</span>
-      </div>
-    </section>
-
-    <section class="calc-result">
-      <span class="calc-result-label">Rendement</span>
-      <span id="calc-rendement" class="calc-result-value">--</span>
-      <span class="calc-formula">minutes produites ÷ temps de production</span>
-    </section>
-
-    <button type="button" id="btn-save-day" class="btn-save-day calc-save">✓ Enregistrer la journée</button>
-
-  </main>
-
-  <!-- ===================== VUE HISTORIQUE ===================== -->
-  <main id="view-history" class="view">
-    <div id="history-list" class="history-list"></div>
-    <p id="history-empty" class="history-empty">Aucune journée enregistrée.<br />Termine ta journée avec « Enregistrer la journée » et elle apparaîtra ici.</p>
-  </main>
-
-  <!-- ===================== BARRE D'ONGLETS ===================== -->
-  <nav class="tabbar">
-    <button type="button" class="tab-btn active" data-view="view-timer">
-      <span class="tab-icon" aria-hidden="true">⏱</span>
-      <span>Minuteur</span>
-    </button>
-    <button type="button" class="tab-btn" data-view="view-calc">
-      <span class="tab-icon" aria-hidden="true">🧮</span>
-      <span>Calcul</span>
-    </button>
-    <button type="button" class="tab-btn" data-view="view-history">
-      <span class="tab-icon" aria-hidden="true">🗓</span>
-      <span>Historique</span>
-    </button>
-  </nav>
-
-  <!-- ===================== MODALE CATEGORIES ===================== -->
-  <div id="modal-cats" class="modal-overlay hidden">
-    <div class="modal-sheet">
-      <h2>Nouvelle catégorie</h2>
-      <div class="modal-add-row">
-        <input type="text" id="new-cat-input" placeholder="Ex : TEMPS RÉGLAGE" maxlength="30" />
-        <button type="button" id="btn-add-cat" class="btn-confirm">Ajouter</button>
-      </div>
-      <div id="custom-cat-section" class="hidden">
-        <h3>Mes catégories</h3>
-        <ul id="custom-cat-list" class="custom-cat-list"></ul>
-      </div>
-      <button type="button" id="modal-cats-close" class="btn-close">Fermer</button>
-    </div>
+<header class="appbar">
+  <div class="appbar-inner">
+    <h1 class="appbar-title">Rendement</h1>
+    <p id="today-date" class="appbar-date"></p>
   </div>
+</header>
 
-  <!-- ===================== BANNIERE D'INSTALLATION ===================== -->
-  <div id="install-banner" class="install-banner hidden">
-    <div class="install-head">
-      <span class="install-title">📲 Installer l'app</span>
-      <button type="button" id="install-dismiss" class="install-dismiss" aria-label="Fermer">✕</button>
-    </div>
-    <div id="install-ios" class="install-body hidden">
-      <p>Pour ajouter Rendement à ton écran d'accueil :</p>
-      <ol>
-        <li>Appuie sur <strong>Partager</strong> <span class="install-icon">⬆︎</span> en bas de Safari</li>
-        <li>Choisis <strong>« Sur l'écran d'accueil »</strong></li>
-        <li>Appuie sur <strong>Ajouter</strong></li>
-      </ol>
-    </div>
-    <div id="install-android" class="install-body hidden">
-      <p>Installe l'app pour l'avoir sur ton écran d'accueil et l'utiliser hors-ligne.</p>
-      <button type="button" id="install-button" class="btn-install">Installer</button>
-    </div>
+<!-- ===================== MINUTEUR ===================== -->
+<main id="view-timer" class="view active" aria-labelledby="timer-heading">
+  <h2 id="timer-heading" class="visually-hidden">Minuteur</h2>
+
+  <section class="panel clock" aria-label="Chrono en cours">
+    <p id="clock-status" class="clock-status">
+      <span id="clock-swatch" class="swatch" aria-hidden="true"></span>
+      <span id="clock-status-text">En attente</span>
+    </p>
+    <p id="clock-time" class="clock-time">00:00</p>
+    <p id="clock-hint" class="clock-hint">Touche une catégorie pour lancer le chrono</p>
+  </section>
+
+  <section class="section" aria-labelledby="cats-heading">
+    <h2 id="cats-heading" class="section-title">Postes minutés</h2>
+    <div id="cat-list" class="cat-list"></div>
+    <button type="button" id="btn-manage-cats" class="btn btn-quiet">
+      <svg class="icon" aria-hidden="true"><use href="#i-plus"/></svg>
+      Ajouter une catégorie
+    </button>
+  </section>
+
+  <section class="panel summary" aria-label="Total du jour">
+    <span class="summary-label">Minutes minutées</span>
+    <span id="grand-total" class="summary-value">0 min</span>
+  </section>
+
+  <div class="actions">
+    <button type="button" id="btn-finish" class="btn btn-primary">
+      Terminer la journée
+      <svg class="icon" aria-hidden="true"><use href="#i-arrow-right"/></svg>
+    </button>
+    <button type="button" id="btn-reset" class="btn btn-danger-quiet">Remettre à zéro sans enregistrer</button>
   </div>
+</main>
 
-  <div id="toast" class="toast hidden" role="status" aria-live="polite"></div>
+<!-- ===================== CALCUL ===================== -->
+<main id="view-calc" class="view" aria-labelledby="calc-heading">
+  <h2 id="calc-heading" class="visually-hidden">Calcul du rendement</h2>
 
-</div>
+  <section class="section" aria-labelledby="net-heading">
+    <h2 id="net-heading" class="section-title">Temps de production</h2>
+    <div class="panel rows">
+      <div class="row">
+        <label for="calc-base" class="row-label">Base</label>
+        <span class="row-value">
+          <input type="text" inputmode="decimal" id="calc-base" class="field field-base" autocomplete="off" />
+          <span class="unit">min</span>
+        </span>
+      </div>
+      <div class="row">
+        <span class="row-label">− Minutes minutées</span>
+        <span id="calc-minuted" class="row-value num">0 min</span>
+      </div>
+      <div class="row row-total">
+        <span class="row-label">= Temps de production</span>
+        <span id="calc-net" class="row-value num">455 min</span>
+      </div>
+    </div>
+  </section>
+
+  <section class="section" aria-labelledby="prod-heading">
+    <div class="section-head">
+      <h2 id="prod-heading" class="section-title">Production</h2>
+      <button type="button" id="btn-calc-clear" class="btn btn-danger-quiet btn-inline">Effacer les quantités</button>
+    </div>
+    <div id="calc-products" class="panel prod-list"></div>
+    <button type="button" id="btn-add-product" class="btn btn-quiet">
+      <svg class="icon" aria-hidden="true"><use href="#i-plus"/></svg>
+      Ajouter une matière
+    </button>
+  </section>
+
+  <section class="panel result" aria-labelledby="result-heading">
+    <h2 id="result-heading" class="result-label">Rendement</h2>
+    <p id="calc-rendement" class="result-value">--</p>
+    <div class="gauge" aria-hidden="true"><span id="calc-gauge" class="gauge-fill"></span><span class="gauge-mark"></span></div>
+    <dl class="result-facts">
+      <div><dt>Minutes produites</dt><dd id="calc-produced" class="num">0 min</dd></div>
+      <div><dt>Temps de production</dt><dd id="calc-net-2" class="num">455 min</dd></div>
+    </dl>
+  </section>
+
+  <div class="actions">
+    <button type="button" id="btn-save-day" class="btn btn-primary">
+      <svg class="icon" aria-hidden="true"><use href="#i-check"/></svg>
+      Enregistrer la journée
+    </button>
+  </div>
+</main>
+
+<!-- ===================== HISTORIQUE ===================== -->
+<main id="view-history" class="view" aria-labelledby="history-heading">
+  <h2 id="history-heading" class="visually-hidden">Historique</h2>
+  <div id="history-list" class="history-list"></div>
+  <div id="history-empty" class="empty">
+    <svg class="icon icon-xl" aria-hidden="true"><use href="#i-clock-counter-clockwise"/></svg>
+    <p class="empty-title">Aucune journée enregistrée</p>
+    <p class="empty-text">En fin de poste, ouvre Calcul et touche « Enregistrer la journée ».</p>
+    <button type="button" id="btn-empty-go" class="btn btn-quiet">Ouvrir Calcul</button>
+  </div>
+</main>
+
+<!-- ===================== BARRE D'ONGLETS ===================== -->
+<nav class="tabbar" aria-label="Sections">
+  <button type="button" class="tab" data-view="view-timer">
+    <span class="tab-pill"><svg class="icon" aria-hidden="true"><use href="#i-timer"/></svg></span>
+    <span class="tab-label">Minuteur</span>
+  </button>
+  <button type="button" class="tab" data-view="view-calc">
+    <span class="tab-pill"><svg class="icon" aria-hidden="true"><use href="#i-calculator"/></svg></span>
+    <span class="tab-label">Calcul</span>
+  </button>
+  <button type="button" class="tab" data-view="view-history">
+    <span class="tab-pill"><svg class="icon" aria-hidden="true"><use href="#i-clock-counter-clockwise"/></svg></span>
+    <span class="tab-label">Historique</span>
+  </button>
+</nav>
+
+<!-- ===================== FENÊTRE : CATÉGORIES ===================== -->
+<dialog id="dlg-cats" class="sheet" aria-labelledby="dlg-cats-title">
+  <form method="dialog" class="sheet-body" id="form-add-cat">
+    <h2 id="dlg-cats-title" class="sheet-title">Nouvelle catégorie</h2>
+    <label for="new-cat-input" class="field-label">Nom du poste</label>
+    <div class="inline-form">
+      <input type="text" id="new-cat-input" class="field" placeholder="Ex. : TEMPS RÉGLAGE" maxlength="30" autocomplete="off" />
+      <button type="submit" id="btn-add-cat" class="btn btn-primary btn-inline" value="add">Ajouter</button>
+    </div>
+    <p id="new-cat-error" class="field-error" hidden></p>
+    <div id="custom-cat-section" hidden>
+      <h3 class="sheet-subtitle">Mes catégories</h3>
+      <ul id="custom-cat-list" class="plain-list"></ul>
+    </div>
+    <button type="button" id="dlg-cats-close" class="btn btn-secondary">Fermer</button>
+  </form>
+</dialog>
+
+<!-- ===================== FENÊTRE : CONFIRMATION / SAISIE ===================== -->
+<dialog id="dlg-ask" class="sheet" aria-labelledby="dlg-ask-title" aria-describedby="dlg-ask-text">
+  <form method="dialog" class="sheet-body" id="form-ask">
+    <h2 id="dlg-ask-title" class="sheet-title"></h2>
+    <p id="dlg-ask-text" class="sheet-text"></p>
+    <div id="dlg-ask-field" hidden>
+      <label for="dlg-ask-input" id="dlg-ask-label" class="field-label"></label>
+      <input type="text" id="dlg-ask-input" class="field" maxlength="30" autocomplete="off" />
+      <p id="dlg-ask-error" class="field-error" hidden></p>
+    </div>
+    <div class="sheet-actions">
+      <button type="button" id="dlg-ask-cancel" class="btn btn-secondary">Annuler</button>
+      <button type="submit" id="dlg-ask-ok" class="btn btn-primary" value="ok"></button>
+    </div>
+  </form>
+</dialog>
+
+<!-- ===================== BANNIÈRE D'INSTALLATION ===================== -->
+<aside id="install-banner" class="install" aria-labelledby="install-title" hidden>
+  <div class="install-head">
+    <h2 id="install-title" class="install-title">Installer l'app</h2>
+    <button type="button" id="install-dismiss" class="btn-icon" aria-label="Fermer">
+      <svg class="icon" aria-hidden="true"><use href="#i-x"/></svg>
+    </button>
+  </div>
+  <ol id="install-ios" class="install-steps" hidden>
+    <li>Touche <strong>Partager</strong> <svg class="icon icon-inline" aria-hidden="true"><use href="#i-export"/></svg> en bas de Safari</li>
+    <li>Choisis <strong>Sur l'écran d'accueil</strong></li>
+    <li>Touche <strong>Ajouter</strong></li>
+  </ol>
+  <div id="install-android" hidden>
+    <p class="install-text">Ajoute Rendement à ton écran d'accueil pour l'utiliser hors connexion.</p>
+    <button type="button" id="install-button" class="btn btn-primary">Installer</button>
+  </div>
+</aside>
+
+<div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
 
 <script src="js/app.js"></script>
 </body>
