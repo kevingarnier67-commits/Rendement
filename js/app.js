@@ -234,6 +234,12 @@
     statusText: $("clock-status-text"),
     time: $("clock-time"),
     stop: $("btn-stop"),
+    since: $("clock-since"),
+    fixTime: $("btn-fix-time"),
+    dlgTime: $("dlg-time"),
+    formTime: $("form-time"),
+    timeList: $("time-list"),
+    timeCancel: $("dlg-time-cancel"),
     pause: $("btn-pause"),
     catList: $("cat-list"),
     grandTotal: $("grand-total"),
@@ -469,6 +475,13 @@
   //   paused : poste gardé sélectionné mais chrono figé ; le temps est déjà compté dans totals
   function isRunning() { return !!(state.active && !state.active.paused); }
 
+  // Heure de lancement du poste (anciens états : déduite de startedAt et base).
+  function sinceOf(a) {
+    if (!a) return null;
+    if (a.since) return a.since;
+    return a.startedAt ? a.startedAt - (a.base || 0) : null;
+  }
+
   function activeElapsed() {
     return isRunning() ? Date.now() - state.active.startedAt : 0;
   }
@@ -489,18 +502,19 @@
     const { id } = state.active;
     const session = sessionElapsed();
     state.totals[id] = totalOf(id) + activeElapsed();
-    state.active = { id, startedAt: null, base: session, paused: true };
+    state.active = { id, startedAt: null, base: session, paused: true, since: sinceOf(state.active) };
     persist();
   }
 
   function resumeActive() {
     if (!state.active || !state.active.paused) return;
-    state.active = { id: state.active.id, startedAt: Date.now(), base: state.active.base || 0, paused: false };
+    state.active = { id: state.active.id, startedAt: Date.now(), base: state.active.base || 0, paused: false, since: sinceOf(state.active) };
     persist();
   }
 
   function startCategory(id) {
-    state.active = { id, startedAt: Date.now(), base: 0, paused: false };
+    const now = Date.now();
+    state.active = { id, startedAt: now, base: 0, paused: false, since: now };
     persist();
   }
 
@@ -579,7 +593,14 @@
     if (activeCat) {
       el.statusText.textContent = paused ? `${activeCat.label} · en pause` : activeCat.label;
       el.time.textContent = formatMinSec(sessionElapsed());
+      const since = sinceOf(state.active);
+      el.since.hidden = !since;
+      if (since) {
+        const txt = `Lancé à ${new Date(since).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}`;
+        if (el.since.textContent !== txt) el.since.textContent = txt;
+      }
     } else {
+      el.since.hidden = true;
       el.statusText.textContent = "Aucun poste en cours";
       el.time.textContent = "00:00";
     }
@@ -625,6 +646,7 @@
   }
 
   const RING_LENGTH = 2 * Math.PI * 52;
+  let calcReady = false;
 
   // Ce qu'il reste à produire pour atteindre l'objectif, en minutes.
   function gapText(c) {
@@ -632,7 +654,16 @@
     if (c.net <= 0) return "Plus de temps de production : vérifie la base et les minutes minutées.";
     if (c.rendement == null) return `Saisis ta production pour voir ton rendement. Objectif : ${t}.`;
     const missing = (c.net * c.target) / 100 - c.produced;
-    if (missing > 0.05) return `Encore ${formatNumber(missing, 1)} min de production pour atteindre ${t}.`;
+    if (missing > 0.05) {
+      // Traduit le manque en pièces de la matière principale du jour.
+      const main = state.calc.products
+        .map((p) => ({ p, min: minutesFor(parseNum(state.calc.qty[p.id]), p) || 0 }))
+        .filter((x) => x.min > 0)
+        .sort((a, b) => b.min - a.min)[0];
+      const pieces = main ? Math.ceil((missing * parseNum(main.p.refQty)) / parseNum(main.p.refMin)) : 0;
+      const extra = pieces > 0 ? `, soit environ ${formatNumber(pieces, 0)} ${main.p.label}` : "";
+      return `Encore ${formatNumber(missing, 1)} min de production pour atteindre ${t}${extra}.`;
+    }
     return `Objectif de ${t} atteint.`;
   }
 
@@ -646,7 +677,9 @@
     const progress = Math.min((c.rendement || 0) / c.target, 1);
     el.calcRing.style.strokeDasharray = `${RING_LENGTH}`;
     el.calcRing.style.strokeDashoffset = `${RING_LENGTH * (1 - progress)}`;
-    el.calcResult.classList.toggle("is-reached", c.rendement != null && c.rendement >= c.target);
+    const reached = c.rendement != null && c.rendement >= c.target;
+    if (reached && !el.calcResult.classList.contains("is-reached") && calcReady && navigator.vibrate) navigator.vibrate(30);
+    el.calcResult.classList.toggle("is-reached", reached);
     el.calcGap.textContent = gapText(c);
     state.calc.products.forEach((p) => {
       const row = el.calcProducts.querySelector(`[data-prod="${p.id}"]`);
@@ -879,8 +912,24 @@
   }
 
   // Graphique des dernières journées (7 max), de la plus ancienne à la plus récente.
+  const RANGE_KEY = "rendement.chartRange.v1";
+  let chartRange = 7;
+  try { if (localStorage.getItem(RANGE_KEY) === "30") chartRange = 30; } catch (e) { /* réglage facultatif */ }
+
+  document.querySelectorAll(".segment").forEach((b) => {
+    b.addEventListener("click", () => {
+      chartRange = Number(b.dataset.range);
+      try { localStorage.setItem(RANGE_KEY, String(chartRange)); } catch (e) { /* réglage facultatif */ }
+      renderChart();
+    });
+  });
+
   function renderChart() {
-    const days = state.history.filter((e) => e.calc && e.calc.rendement != null).slice(0, 7).reverse();
+    document.querySelectorAll(".segment").forEach((b) => {
+      b.setAttribute("aria-pressed", Number(b.dataset.range) === chartRange ? "true" : "false");
+    });
+    const days = state.history.filter((e) => e.calc && e.calc.rendement != null).slice(0, chartRange).reverse();
+    el.historyChart.classList.toggle("is-dense", days.length > 10);
     el.historySummary.hidden = days.length === 0;
     if (!days.length) return;
     const target = computeCalc().target;
@@ -899,7 +948,7 @@
     const labels = document.createElement("div");
     labels.className = "chart-labels";
 
-    days.forEach((d) => {
+    days.forEach((d, i) => {
       const r = d.calc.rendement;
       const col = document.createElement("div");
       col.className = "chart-col";
@@ -917,8 +966,12 @@
       const lab = document.createElement("span");
       lab.className = "chart-day";
       lab.innerHTML = `<span></span><span></span>`;
-      lab.children[0].textContent = date.toLocaleDateString("fr-FR", { weekday: "short" });
-      lab.children[1].textContent = date.getDate();
+      // En vue dense, une étiquette sur cinq (en partant de la plus récente).
+      const showLabel = days.length <= 10 || (days.length - 1 - i) % 5 === 0;
+      if (showLabel) {
+        lab.children[0].textContent = date.toLocaleDateString("fr-FR", { weekday: "short" });
+        lab.children[1].textContent = date.getDate();
+      }
       labels.appendChild(lab);
     });
     el.historyChart.append(plot, labels);
@@ -1113,6 +1166,59 @@
     toast(`${label} ajouté`);
   });
 
+  // ---------- feuille : corriger les minutes ----------
+  function openTimeSheet() {
+    el.timeList.innerHTML = "";
+    state.categories.forEach((cat, i) => {
+      const row = document.createElement("div");
+      row.className = "row cat";
+      setTone(row, cat.tone);
+      row.innerHTML = `
+        <span class="row-icon" aria-hidden="true">${icon("timer")}</span>
+        <label class="row-title" for="fix-${i}"></label>
+        <span class="row-trailing">
+          <input type="text" inputmode="numeric" id="fix-${i}" class="field field-sm" autocomplete="off" />
+          <span class="row-unit">min</span>
+        </span>`;
+      row.querySelector("label").textContent = cat.label;
+      const input = row.querySelector("input");
+      input.value = String(minutesOf(liveTotalOf(cat.id)));
+      input.dataset.cat = cat.id;
+      input.dataset.initial = input.value;
+      bindNumeric(input, digitsOnly, () => {});
+      el.timeList.appendChild(row);
+    });
+    openDialog(el.dlgTime);
+  }
+
+  // Fixe le total d'un poste à `minutes`. Un poste en cours continue de tourner à partir de là.
+  function setMinutes(id, minutes) {
+    if (state.active && state.active.id === id && isRunning()) {
+      const elapsed = activeElapsed();
+      state.active.base = (state.active.base || 0) + elapsed;
+      state.active.startedAt = Date.now();
+    }
+    state.totals[id] = minutes * 60000;
+  }
+
+  el.fixTime.addEventListener("click", openTimeSheet);
+  el.timeCancel.addEventListener("click", () => closeDialog(el.dlgTime));
+  makeDismissible(el.dlgTime, () => closeDialog(el.dlgTime));
+  el.formTime.addEventListener("submit", (e) => {
+    e.preventDefault();
+    let changed = 0;
+    el.timeList.querySelectorAll("input").forEach((input) => {
+      if (input.value === input.dataset.initial) return;
+      setMinutes(input.dataset.cat, parseNum(input.value) || 0);
+      changed += 1;
+    });
+    closeDialog(el.dlgTime);
+    if (!changed) return;
+    persist();
+    render();
+    toast("Minutes corrigées");
+  });
+
   // ---------- sauvegarde ----------
   el.exportBtn.addEventListener("click", async () => {
     const day = new Date().toISOString().slice(0, 10);
@@ -1174,6 +1280,7 @@
   render();
   renderHistory();
   showView("view-timer");
+  calcReady = true;
 
   // ---------- bannière d'installation ----------
   const INSTALL_DISMISS_KEY = "rendement.installDismissed.v1";

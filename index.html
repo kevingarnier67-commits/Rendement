@@ -57,6 +57,7 @@
       <span id="clock-dot" class="status-dot" aria-hidden="true"></span>
       <span id="clock-status-text">Aucun poste en cours</span>
     </p>
+    <p id="clock-since" class="stopwatch-since" hidden></p>
     <div class="stopwatch-actions">
       <button type="button" id="btn-pause" class="round-btn round-pause" hidden>Pause</button>
       <button type="button" id="btn-stop" class="round-btn round-stop" hidden>Arrêter</button>
@@ -70,6 +71,10 @@
       <button type="button" id="btn-manage-cats" class="row row-action">
         <svg class="icon" aria-hidden="true"><use href="#i-plus"/></svg>
         <span>Gérer les postes</span>
+      </button>
+      <button type="button" id="btn-fix-time" class="row row-action">
+        <svg class="icon" aria-hidden="true"><use href="#i-pencil-simple"/></svg>
+        <span>Corriger les minutes</span>
       </button>
     </div>
     <p class="group-footer">Touche un poste pour lancer son chrono, touche-le à nouveau pour le mettre en pause. Arrêter termine le poste.</p>
@@ -138,6 +143,7 @@
     <div class="list">
       <div id="calc-result" class="result">
         <div class="ring" aria-hidden="true">
+          <svg class="icon ring-check"><use href="#i-check"/></svg>
           <svg class="ring-svg" viewBox="0 0 120 120" focusable="false">
             <circle class="ring-track" cx="60" cy="60" r="52"/>
             <circle id="calc-ring" class="ring-fill" cx="60" cy="60" r="52"/>
@@ -185,9 +191,15 @@
     <h2 id="summary-header" class="group-header">Dernières journées</h2>
     <div class="list">
       <div class="chart-card">
-        <div class="chart-head">
-          <span class="chart-kicker">Moyenne</span>
-          <span id="history-avg" class="chart-avg">--</span>
+        <div class="chart-top">
+          <div class="chart-head">
+            <span class="chart-kicker">Moyenne</span>
+            <span id="history-avg" class="chart-avg">--</span>
+          </div>
+          <div class="segmented" role="group" aria-label="Période du graphique">
+            <button type="button" class="segment" data-range="7" aria-pressed="true" aria-label="7 dernières journées">7</button>
+            <button type="button" class="segment" data-range="30" aria-pressed="false" aria-label="30 dernières journées">30</button>
+          </div>
         </div>
         <div id="history-chart" class="chart" role="img"></div>
       </div>
@@ -267,6 +279,31 @@
       <h3 class="group-header">Postes ajoutés</h3>
       <div id="custom-cat-list" class="list"></div>
     </section>
+  </form>
+</dialog>
+
+<!-- ===================== FEUILLE : CORRIGER LES MINUTES ===================== -->
+<dialog id="dlg-time" class="sheet" aria-labelledby="dlg-time-title">
+  <form id="form-time">
+    <div class="sheet-handle">
+      <div class="sheet-grabber" aria-hidden="true"></div>
+      <div class="sheet-nav">
+        <button type="button" id="dlg-time-cancel" class="circle-btn" aria-label="Annuler">
+          <svg class="icon" aria-hidden="true"><use href="#i-x"/></svg>
+        </button>
+        <h2 id="dlg-time-title" class="sheet-nav-title">Corriger les minutes</h2>
+        <button type="submit" id="dlg-time-ok" class="circle-btn circle-btn-prominent" aria-label="Enregistrer les minutes">
+          <svg class="icon" aria-hidden="true"><use href="#i-check"/></svg>
+        </button>
+      </div>
+    </div>
+    <div class="sheet-content">
+      <section class="group">
+        <h3 class="group-header">Minutes par poste</h3>
+        <div id="time-list" class="list"></div>
+        <p class="group-footer">Pour un poste oublié ou lancé trop tard. Un poste en cours continue de tourner à partir de la valeur saisie.</p>
+      </section>
+    </div>
   </form>
 </dialog>
 
