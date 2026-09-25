@@ -128,7 +128,7 @@
     normalizeCategories(s.categories);
     if (!s.totals || typeof s.totals !== "object") s.totals = {};
     if (!Array.isArray(s.history)) s.history = [];
-    if (s.active && !(s.active.id && s.active.startedAt)) s.active = null;
+    if (s.active && !(s.active.id && (s.active.startedAt || s.active.paused))) s.active = null;
     return s;
   }
 
@@ -234,6 +234,7 @@
     statusText: $("clock-status-text"),
     time: $("clock-time"),
     stop: $("btn-stop"),
+    pause: $("btn-pause"),
     catList: $("cat-list"),
     grandTotal: $("grand-total"),
     saveDay: $("btn-save-day"),
@@ -463,8 +464,17 @@
   // ---------- chrono ----------
   function totalOf(id) { return state.totals[id] || 0; }
 
+  // state.active = { id, startedAt, base, paused }
+  //   base : temps déjà écoulé dans cette session avant la dernière reprise (pour le grand chrono)
+  //   paused : poste gardé sélectionné mais chrono figé ; le temps est déjà compté dans totals
+  function isRunning() { return !!(state.active && !state.active.paused); }
+
   function activeElapsed() {
-    return state.active ? Date.now() - state.active.startedAt : 0;
+    return isRunning() ? Date.now() - state.active.startedAt : 0;
+  }
+
+  function sessionElapsed() {
+    return state.active ? (state.active.base || 0) + activeElapsed() : 0;
   }
 
   function stopActive() {
@@ -474,8 +484,23 @@
     persist();
   }
 
+  function pauseActive() {
+    if (!isRunning()) return;
+    const { id } = state.active;
+    const session = sessionElapsed();
+    state.totals[id] = totalOf(id) + activeElapsed();
+    state.active = { id, startedAt: null, base: session, paused: true };
+    persist();
+  }
+
+  function resumeActive() {
+    if (!state.active || !state.active.paused) return;
+    state.active = { id: state.active.id, startedAt: Date.now(), base: state.active.base || 0, paused: false };
+    persist();
+  }
+
   function startCategory(id) {
-    state.active = { id, startedAt: Date.now() };
+    state.active = { id, startedAt: Date.now(), base: 0, paused: false };
     persist();
   }
 
@@ -509,7 +534,7 @@
       btn.addEventListener("click", () => {
         if (toastRun) hideToast();
         if (state.active && state.active.id === cat.id) {
-          stopActive();
+          if (state.active.paused) resumeActive(); else pauseActive();
         } else {
           stopActive();
           startCategory(cat.id);
@@ -523,26 +548,37 @@
   function render() {
     const activeId = state.active ? state.active.id : null;
     const activeCat = activeId ? state.categories.find((c) => c.id === activeId) : null;
+    const running = !!activeCat && isRunning();
+    const paused = !!activeCat && !running;
 
     Array.from(el.catList.children).forEach((btn) => {
       const id = btn.dataset.cat;
       const isActive = id === activeId;
-      const wasActive = btn.classList.contains("is-running");
-      btn.classList.toggle("is-running", isActive);
-      btn.setAttribute("aria-pressed", isActive ? "true" : "false");
-      btn.querySelector(".cat-sub").hidden = !isActive;
-      if (isActive !== wasActive) {
-        btn.querySelector(".cat-toggle use").setAttribute("href", isActive ? "#i-stop" : "#i-play");
-      }
+      const isRun = isActive && running;
+      const isPaused = isActive && paused;
+      btn.classList.toggle("is-running", isRun);
+      btn.classList.toggle("is-paused", isPaused);
+      btn.setAttribute("aria-pressed", isRun ? "true" : "false");
+      const sub = btn.querySelector(".cat-sub");
+      sub.hidden = !isActive;
+      const subText = isPaused ? "En pause" : "En cours";
+      if (sub.textContent !== subText) sub.textContent = subText;
+      const use = btn.querySelector(".cat-toggle use");
+      const href = isRun ? "#i-pause" : "#i-play";
+      if (use.getAttribute("href") !== href) use.setAttribute("href", href);
       btn.querySelector(".cat-min").textContent = formatMinutes(liveTotalOf(id));
     });
 
-    el.stopwatch.classList.toggle("is-running", !!activeCat);
+    el.stopwatch.classList.toggle("is-running", running);
+    el.stopwatch.classList.toggle("is-paused", paused);
     setTone(el.stopwatch, activeCat ? activeCat.tone : null);
     el.stop.hidden = !activeCat;
+    el.pause.hidden = !activeCat;
+    el.pause.textContent = paused ? "Reprendre" : "Pause";
+    el.pause.classList.toggle("is-resume", paused);
     if (activeCat) {
-      el.statusText.textContent = activeCat.label;
-      el.time.textContent = formatMinSec(activeElapsed());
+      el.statusText.textContent = paused ? `${activeCat.label} · en pause` : activeCat.label;
+      el.time.textContent = formatMinSec(sessionElapsed());
     } else {
       el.statusText.textContent = "Aucun poste en cours";
       el.time.textContent = "00:00";
@@ -550,12 +586,18 @@
 
     el.grandTotal.textContent = `${minutedMinutes()} min`;
     el.tabRunning.hidden = !activeCat;
+    el.tabRunning.classList.toggle("is-paused", paused);
     el.tabRunningSr.hidden = !activeCat;
+    el.tabRunningSr.textContent = paused ? ", chrono en pause" : ", chrono en cours";
     setTone(el.tabRunning, activeCat ? activeCat.tone : null);
     renderCalcResults();
   }
 
   el.stop.addEventListener("click", () => { stopActive(); render(); });
+  el.pause.addEventListener("click", () => {
+    if (isRunning()) pauseActive(); else resumeActive();
+    render();
+  });
 
   // ---------- calcul du rendement ----------
   // Temps de production = base (455 min) − minutes minutées.
@@ -1123,7 +1165,7 @@
   });
 
   // ---------- chrono en direct ----------
-  setInterval(() => { if (state.active) render(); }, 250);
+  setInterval(() => { if (isRunning()) render(); }, 250);
 
   // ---------- init ----------
   persist();
