@@ -27,6 +27,10 @@ L'onglet **Historique** montre un graphique des 7 dernières journées avec la m
 
 Quand un chrono tourne, une pastille de la couleur du poste apparaît sur l'onglet Minuteur (fixe quand il est en pause).
 
+**Corriger les minutes** (sous la liste des postes) : pour un poste oublié ou lancé trop tard, saisis directement les minutes de chaque poste. Sous le chrono, l'heure de lancement du poste est affichée (« Lancé à 14:05 »).
+
+Dans Calcul, le reste à produire pour l'objectif est aussi donné en pièces de la matière principale du jour (« soit environ 218 Cages »), et une coche apparaît dans l'anneau quand l'objectif est atteint. Le graphique de l'historique affiche les 7 ou les 30 dernières journées.
+
 Tout est stocké en local sur le téléphone (aucune donnée envoyée sur internet) et l'app fonctionne hors-ligne une fois installée. Le chrono continue de tourner même si l'app est fermée : il est basé sur l'heure de démarrage, pas sur un compteur actif.
 
 ## Design
